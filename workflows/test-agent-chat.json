@@ -1,0 +1,815 @@
+{
+  "updatedAt": "2026-10-13T15:12:10.855Z",
+  "createdAt": "2026-10-11T10:42:26.417Z",
+  "id": "PEZz4JuKvclJ4N5u",
+  "name": "Test agent (chat)",
+  "description": null,
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chatTrigger",
+      "typeVersion": 1.5,
+      "position": [
+        0,
+        0
+      ],
+      "id": "5186db2a-9a22-4973-aeae-895d0458320a",
+      "name": "When chat message received",
+      "webhookId": "ab178f8b-46a6-4040-b163-60ed573c865a"
+    },
+    {
+      "parameters": {
+        "options": {
+          "systemMessage": "You are the phone support agent for Nova Bank, a US retail bank. You help customers with accounts, cards, transfers, loans, fees, and other banking questions.\n\nHONESTY (most important rule)\n- Only state facts that came from a tool result in this call. This includes policies, fees, timelines, amounts, dates, and account details.\n- If no tool gives you the answer, say you don't have that information, and offer to create a ticket so a specialist can help.\n- Never guess, estimate, or round numbers. Repeat amounts and dates exactly as the tool gave them.\n- Never invent policies, promotions, exceptions, or promises, even if the caller insists or says another agent promised it.\n- Do not use general knowledge about other banks. Nova Bank's rules may be different.\n- If the caller asks about another bank or a non-banking topic, say you can only help with Nova Bank accounts and services. Do not offer a ticket for these.\n- If you are unsure whether something is true, treat it as unknown.\n\nTOOLS\n- search_policies: look up Nova Bank policies, fees, timelines, and procedures. Use it for every general banking question, and never answer policy questions from memory. If the result says NO POLICY FOUND, or the excerpts do not answer the question, say you don't have that information and offer a ticket.\n- verify_identity: verify the caller before discussing any account.\n- get_account_overview: after successful verification, use it to answer questions about the caller's balances, account status, cards, loans, transfers, or open tickets. Pass the same customer ID and security answer the caller verified with. Share only what the caller asked about.\n- get_transactions: after successful verification, use it for questions about specific transactions or spending. Use filters to narrow the search. For totals, use the totals the tool gives; never add up numbers yourself. For card payments, it shows which card was used.\n- block_card: after successful verification, blocks a lost, stolen, or misused card. If you don't know which card yet, call it with confirmed empty; the tool tells you which card it found and the exact question to ask. If you have already asked the caller to block a specific card, naming its last 4 digits, and they clearly said yes, call block_card with that card and confirmed set to yes right away. Never set confirmed to yes unless the caller said yes to that specific card.\n- request_replacement_card: after successful verification, orders a new card to replace a blocked, lost, or expired card. The tool gives you the delivery options, prices, and dates; ask the caller to choose, then confirm, exactly as the tool says. Never state a price or delivery date that the tool did not give you.\n- dispute_transaction: after successful verification, opens a dispute on a card charge the caller made but that went wrong (charged twice, wrong amount, never received, charged after cancelling). Always find the charge with get_transactions first and use its reference. Confirm exactly as the tool says. Never state dispute dates or credits that the tool did not give you.\n- create_ticket: hands the case to a human specialist. Use it when the caller asks for a human, needs something you cannot do yourself, has a complaint, reports fraud, cannot be verified, or asks something you have no information about. It works for unverified callers too. Write a short, clear summary: what happened, what the caller wants, and what you already did. Confirm as the tool says.\n- endCall: ends the phone call. Use it only after the caller has said they need nothing else and you have said goodbye. Never end the call while the caller is in the middle of a request, or while a question is still waiting for an answer.\n- Do not repeat a tool for the same request, unless the tool's result tells you to use it again (for example, after the caller chooses or confirms). Never try to use a tool that is not listed here.\n\nHANDLING COMMON SITUATIONS\n- Dispute or fraud: if the caller made the purchase but something went wrong, it is a dispute. If the caller did not make the purchase at all, it is fraud.\n- Fraud, lost, or stolen cards: offer to block the card right away; blocking comes before anything else, because every minute the card stays active, more charges can happen. For fraud, block the card that was used for the charges: get_transactions shows \"paid with debit card ending ...\" for each card payment, so pass those last 4 digits to block_card. If that card is already blocked, tell the caller instead of blocking another card. As soon as the card is blocked, create an urgent fraud ticket listing the charges the caller did not make (merchant, date, amount). Only after the ticket, offer a replacement card.\n- If the caller declines to block their card, respect their choice and do not ask again. In one sentence, explain the risk: the card can still be used for more charges until it is blocked. Then offer an urgent fraud ticket so the fraud team can investigate, and say they can call back anytime to block the card.\n- When get_account_overview shows a problem (a frozen or dormant account, a blocked, lost, or expired card, a late loan, a failed, returned, or held transfer, or an overdrawn balance), also use search_policies to find what happens next, and tell the caller the next steps in one or two sentences.\n- If the caller mentions a charge they don't recognize, use get_transactions with no search filter and days set to 14. Mention at most four charges, starting with the largest or least familiar ones (date, merchant, amount), and ask which ones they don't recognize. Offer to read more if needed.\n- If the caller thinks they were charged twice, use get_transactions with no search filter and days set to 60, and only report charges listed under POSSIBLE DUPLICATE CHARGES. If one is found, offer to dispute the likely duplicate, using the second reference listed. If none are listed, say no duplicate charges were found, and ask which merchant and roughly when.\n- You cannot approve refunds, fee waivers, limit increases, or loans, and you cannot cancel transfers. Explain this briefly and offer a ticket so a specialist can review it.\n- If the caller asks for a human, do not argue or try to keep them. Offer a ticket right away; if it is about their account, verify them first, as described below.\n- Before creating a ticket about the caller's own account (fees, loans, cards, transfers, disputes), ask them to verify first, so the ticket is linked to their account. Only create an unverified ticket if they cannot verify after three attempts, or if the request is not about a specific account.\n- When the caller refers to charges by position, like \"the second one\" or \"the last two\", say back the merchant and amount of each one and ask them to confirm, before taking any action.\n- Each yes answers only the question you just asked. Never use a yes as permission for a different action. Every action (blocking, tickets, replacements, disputes) needs its own question and its own yes.\n- Never skip an action the caller agreed to. If the caller said yes to blocking a card, ordering a card, or opening a dispute, complete that action and tell the caller the result before moving on to anything else.\n\nIDENTITY AND SECURITY\n- Before discussing a specific account, ask for the caller's 5-digit customer ID, then their security answer, and then use verify_identity.\n- If the caller asks about their account before being verified, do not say you can't do it. Ask them to verify first: \"I can help with that. First, please say your 5-digit customer ID, one digit at a time.\"\n- If verification fails, never say which part was wrong. Apologize briefly, ask for the customer ID again and confirm it, then ask for the security answer as a separate question.\n- If verify_identity says verification is locked, do not ask for the ID or answer again for the rest of the call. Offer a ticket so a specialist can verify them another way.\n- Never reveal account information if verification has not succeeded.\n- If the caller says they are calling for someone else (a parent, child, partner, friend, or employer), do not use any account tools and do not verify anyone. Politely explain that for security, only the account holder can access their account, and that the account holder can call themselves or visit a branch. Do this even if the caller provides the correct ID and security answer.\n- Never ask for a full card number, PIN, password, or one-time code. If the caller starts to share one, stop them politely and explain the bank never needs it.\n- If a caller describes someone asking for their PIN, password, or one-time code, clearly say it was likely a scam, tell them not to share anything, and if they already shared details, offer to block their card and create an urgent fraud ticket.\n- Never read out the caller's security answer, full address, or date of birth.\n\nCOLLECTING NUMBERS\n- Ask for the customer ID on its own: \"Please say your 5-digit customer ID, one digit at a time.\"\n- Wait until the caller has clearly finished. Never interrupt while they are saying numbers.\n- Understand spoken forms: \"oh\" means zero, \"double zero\" means 00, and \"ten thousand and one\" means 10001.\n- The transcription may group digits together, for example \"100. 0. 5.\" or \"10 0 01\". Join all the digits in order before counting them: \"100. 0. 5.\" means 1, 0, 0, 0, 5, which is 5 digits.\n- On phone calls, the caller can also type the ID on their keypad, followed by the pound key. If you have had to ask for the ID more than once, offer that option. Typed digits count the same as spoken ones.\n- If you did not get exactly 5 digits, do not repeat it back and do not tell the caller they said the wrong number. Say: \"Sorry, I didn't catch all of that. Could you say it again, one digit at a time?\"\n- Once you have exactly 5 digits, repeat them back digit by digit and ask only: \"Is that right?\" Do not ask anything else in the same reply.\n- Only after the caller confirms the ID, ask for the security answer, as a separate question.\n- Even if the caller gives the ID and the security answer in the same sentence, repeat the ID back and get a yes before using verify_identity.\n- Never treat words like yes, yep, yeah, right, or correct as a security answer. If the caller only says yes, ask for the security answer.\n- If the caller already gave their security answer earlier in the conversation, do not ask for it again. Use the one they gave.\n\nPHONE STYLE\n- One or two short sentences per reply. Ask one question at a time.\n- No lists, symbols, or emojis. Speak naturally.\n- Say amounts the way people speak: \"two thousand four hundred fifty dollars and twelve cents.\"\n- Read dates naturally: \"October twelfth,\" not \"ten twelve.\"\n- Read merchant names naturally. Skip codes like INTL POS or ONLINE PURCHASE, and say country codes as country names, for example NG is Nigeria and HK is Hong Kong.\n- If the caller is upset, acknowledge it briefly and focus on solving the problem.\n- Never end a reply with only a statement while there are still steps left. After completing an action, say the result in one short sentence, then ask the next question in the same reply, so the caller always knows what happens next.\n- Ask \"Is there anything else I can help you with?\" only once the caller's issue is fully resolved, not after every reply. If the caller says no, say goodbye, then use endCall to end the call.\n",
+          "maxIterations": 5
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        736,
+        0
+      ],
+      "id": "8abf028f-4231-455d-8c5b-93728fcb3d6a",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.4,
+      "position": [
+        360,
+        232
+      ],
+      "id": "8271939d-bf93-48b5-8938-2b32fcbb8c0a",
+      "name": "Simple Memory"
+    },
+    {
+      "parameters": {
+        "description": "Verifies the caller's identity. Use this after the caller gives their 5-digit customer ID and their security answer, before sharing any account information.",
+        "workflowId": {
+          "__rl": true,
+          "value": "5tOgmKBVGojVnXI0",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/5tOgmKBVGojVnXI0",
+          "cachedResultName": "Tool - verify_identity"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "customer_id": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('customer_id', ``, 'string') }}",
+            "security_answer": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('security_answer', ``, 'string') }}",
+            "session_id": "={{ $('When chat message received').item.json.sessionId }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "customer_id",
+              "displayName": "customer_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "security_answer",
+              "displayName": "security_answer",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        488,
+        232
+      ],
+      "id": "69bd1af7-c134-4202-883b-12f9aaf668cc",
+      "name": "verify_identity"
+    },
+    {
+      "parameters": {
+        "description": "Searches Nova Bank's official policies: fees, cards, transfers, loans, disputes, fraud, accounts, overdraft, online banking, opening hours, and support. Use this for every general banking question. Pass the caller's question as a short search phrase.",
+        "workflowId": {
+          "__rl": true,
+          "value": "vKBsQKx6vVs6DJXD",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/vKBsQKx6vVs6DJXD",
+          "cachedResultName": "Tool - search_policies"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "question": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('question', ``, 'string') }}"
+          },
+          "matchingColumns": [
+            "question"
+          ],
+          "schema": [
+            {
+              "id": "question",
+              "displayName": "question",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        616,
+        232
+      ],
+      "id": "87a55518-0cfd-46f3-9a55-91cf060ae4a9",
+      "name": "search_policies"
+    },
+    {
+      "parameters": {
+        "description": "Gets a verified customer's full account overview: account balances and status, cards and their status and limits, loans and payment status, transfers from the last 60 days, and open support tickets. Use only after verify_identity succeeded. Pass the same customer ID and security answer the caller used to verify.",
+        "workflowId": {
+          "__rl": true,
+          "value": "unCPxmqIyzTNQfdV",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/unCPxmqIyzTNQfdV",
+          "cachedResultName": "Tool - get_account_overview"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "customer_id": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('customer_id', ``, 'string') }}",
+            "security_answer": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('security_answer', ``, 'string') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "customer_id",
+              "displayName": "customer_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "security_answer",
+              "displayName": "security_answer",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        744,
+        232
+      ],
+      "id": "879370f9-d5c6-4913-8c60-a64c53a48245",
+      "name": "get_account_overview"
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-3.5-flash-lite",
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        232,
+        232
+      ],
+      "id": "869d357e-acd7-4cbc-a877-0beab371da87",
+      "name": "Gemini Chat Model",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "pjbtgd3N7GIQG1Ch",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "description": "Gets a verified customer's transactions. Optional filters: days (how far back, default 30, maximum 180), search (a merchant name like \"amazon\" or a category like \"groceries\"), account_type (\"checking\" or \"savings\"), and limit (how many to list, default 10). Returns totals and a reference for each transaction. Use only after verify_identity succeeded, with the same customer ID and security answer.",
+        "workflowId": {
+          "__rl": true,
+          "value": "NFTSqQL2biy6mDeI",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/NFTSqQL2biy6mDeI",
+          "cachedResultName": "Tool - get_transactions"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "customer_id": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('customer_id', ``, 'string') }}",
+            "security_answer": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('security_answer', ``, 'string') }}",
+            "days": "={{ $fromAI('days', 'How many days back to look, as a number. Leave empty for 30.', 'string', '') }}",
+            "search": "={{ $fromAI('search', 'A merchant name like amazon, or a category like groceries, income, dining, utilities, housing, cash, fees, transfer. Leave empty for all.', 'string', '') }}",
+            "account_type": "={{ $fromAI('account_type', 'checking or savings. Leave empty for both.', 'string', '') }}",
+            "limit": "={{ $fromAI('limit', 'How many transactions to list, as a number. Leave empty for 10.', 'string', '') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "customer_id",
+              "displayName": "customer_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "security_answer",
+              "displayName": "security_answer",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "days",
+              "displayName": "days",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "search",
+              "displayName": "search",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "account_type",
+              "displayName": "account_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "limit",
+              "displayName": "limit",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        872,
+        232
+      ],
+      "id": "6054c1bc-ad48-4bce-9805-b0db713fe171",
+      "name": "get_transactions"
+    },
+    {
+      "parameters": {
+        "description": "Blocks a verified customer's lost, stolen, or misused card so it can no longer be used. Pass the card (its last 4 digits, or \"debit\" or \"credit\"; leave empty if the customer has only one card), the reason in the caller's words, and confirmed. The first time, leave confirmed empty: the tool tells you which card it found and the exact question to ask the caller. Only after the caller clearly says yes, use it again with confirmed set to yes.",
+        "workflowId": {
+          "__rl": true,
+          "value": "6LAz7zePjc0pSCTM",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/6LAz7zePjc0pSCTM",
+          "cachedResultName": "Tool - block_card"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "customer_id": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('customer_id', ``, 'string') }}",
+            "security_answer": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('security_answer', ``, 'string') }}",
+            "card": "={{ $fromAI('card', 'Which card: its last 4 digits, or debit or credit. Leave empty if the customer has only one card.', 'string', '') }}",
+            "reason": "={{ $fromAI('reason', 'Why the card should be blocked, in the caller own words, for example lost, stolen, or charges I did not make.', 'string', '') }}",
+            "confirmed": "={{ $fromAI('confirmed', 'yes only if the caller has clearly said yes to blocking this specific card. Otherwise leave empty.', 'string', '') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "customer_id",
+              "displayName": "customer_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "security_answer",
+              "displayName": "security_answer",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "card",
+              "displayName": "card",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "confirmed",
+              "displayName": "confirmed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1000,
+        232
+      ],
+      "id": "2f13ce19-3f72-4981-847b-e17f502e391a",
+      "name": "block_card"
+    },
+    {
+      "parameters": {
+        "description": "Orders a replacement for a verified customer's blocked, lost, or expired card. Pass the card (its last 4 digits, or \"debit\" or \"credit\"; leave empty if only one card needs replacing), the delivery the caller chose (\"standard\" or \"express\"; leave empty if they haven't chosen), and confirmed. The tool tells you the prices, dates, and the exact questions to ask. Only after the caller clearly says yes, use it again with confirmed set to yes.",
+        "workflowId": {
+          "__rl": true,
+          "value": "VhoZe20iPhGzxXhZ",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/VhoZe20iPhGzxXhZ",
+          "cachedResultName": "Tool - request_replacement_card"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "customer_id": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('customer_id', ``, 'string') }}",
+            "security_answer": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('security_answer', ``, 'string') }}",
+            "card": "={{ $fromAI('card', 'Which card: its last 4 digits, or debit or credit. Leave empty if only one card needs replacing.', 'string', '') }}",
+            "delivery": "={{ $fromAI('delivery', 'standard or express, as chosen by the caller. Leave empty if they have not chosen yet.', 'string', '') }}",
+            "confirmed": "={{ $fromAI('confirmed', 'yes only if the caller has clearly said yes to this exact replacement order. Otherwise leave empty.', 'string', '') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "customer_id",
+              "displayName": "customer_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "security_answer",
+              "displayName": "security_answer",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "card",
+              "displayName": "card",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "delivery",
+              "displayName": "delivery",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "confirmed",
+              "displayName": "confirmed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1128,
+        232
+      ],
+      "id": "3fb0f5d9-4098-4d02-a984-8a62df370a81",
+      "name": "request_replacement_card"
+    },
+    {
+      "parameters": {
+        "description": "Opens a dispute on a verified customer's card charge that was wrong: charged twice, wrong amount, goods or service never received, or charged after cancelling. Not for charges the customer did not make (that is fraud: block the card instead). Pass the transaction reference from get_transactions (like T1000531), the reason in the caller's words, and confirmed. The tool checks the rules and tells you the exact question to ask. Only after the caller clearly says yes, use it again with confirmed set to yes.",
+        "workflowId": {
+          "__rl": true,
+          "value": "HLxXzqZXysfPFX6f",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/HLxXzqZXysfPFX6f",
+          "cachedResultName": "Tool - dispute_transaction"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "customer_id": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('customer_id', ``, 'string') }}",
+            "security_answer": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('security_answer', ``, 'string') }}",
+            "reference": "={{ $fromAI('reference', 'The transaction reference from get_transactions, like T1000531.', 'string', '') }}",
+            "reason": "={{ $fromAI('reason', 'What went wrong, in the caller own words, for example charged twice or never received my order. Leave empty if not known yet.', 'string', '') }}",
+            "confirmed": "={{ $fromAI('confirmed', 'yes only if the caller has clearly said yes to disputing this exact charge. Otherwise leave empty.', 'string', '') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "customer_id",
+              "displayName": "customer_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "security_answer",
+              "displayName": "security_answer",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "reference",
+              "displayName": "reference",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "confirmed",
+              "displayName": "confirmed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1256,
+        232
+      ],
+      "id": "d2a7e6fc-80b8-4c65-afb7-5b598cadbd7d",
+      "name": "dispute_transaction"
+    },
+    {
+      "parameters": {
+        "description": "Creates a support ticket so a human specialist follows up. Use it when the caller asks for a human, needs something you cannot do (refunds, fee reviews, limit increases, loan hardship, cancelling a transfer), has a complaint, reports fraud, cannot be verified, or asks something you have no information about. Works for verified and unverified callers. Pass a short, clear summary in description: what happened, what the caller wants, and what you already did. The tool decides the priority and tells you the exact question to ask. Only after the caller agrees, use it again with confirmed set to yes.",
+        "workflowId": {
+          "__rl": true,
+          "value": "NErRrDDH1i2hvCLA",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/NErRrDDH1i2hvCLA",
+          "cachedResultName": "Tool - create_ticket"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "customer_id": "={{ $fromAI('customer_id', 'The customer ID the caller gave, if any.', 'string', '') }}",
+            "security_answer": "={{ $fromAI('security_answer', 'The security answer the caller gave, if any.', 'string', '') }}",
+            "category": "={{ $fromAI('category', 'A one-word topic hint, like fraud, card, transfer, loan, fees, account, complaint.', 'string', '') }}",
+            "description": "={{ $fromAI('description', 'A short summary: what happened, what the caller wants, and what was already done.', 'string', '') }}",
+            "confirmed": "={{ $fromAI('confirmed', 'yes only if the caller agreed to the ticket. Otherwise leave empty.', 'string', '') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "customer_id",
+              "displayName": "customer_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "security_answer",
+              "displayName": "security_answer",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "description",
+              "displayName": "description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "confirmed",
+              "displayName": "confirmed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "caller_number",
+              "displayName": "caller_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolWorkflow",
+      "typeVersion": 2.2,
+      "position": [
+        1384,
+        232
+      ],
+      "id": "843bd521-5faf-4d98-a2c3-94cc652f8464",
+      "name": "create_ticket"
+    }
+  ],
+  "connections": {
+    "When chat message received": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Simple Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "verify_identity": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "search_policies": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_account_overview": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get_transactions": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "block_card": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "request_replacement_card": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "dispute_transaction": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "create_ticket": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "activeVersionId": null,
+  "versionCounter": 192,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}

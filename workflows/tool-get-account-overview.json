@@ -1,0 +1,108 @@
+{
+  "updatedAt": "2026-10-13T16:25:29.743Z",
+  "createdAt": "2026-10-11T17:55:22.048Z",
+  "id": "unCPxmqIyzTNQfdV",
+  "name": "Tool - get_account_overview",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "customer_id"
+            },
+            {
+              "name": "security_answer"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "9b22df6c-8ced-4add-8453-2f30c624da80",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH c AS (\n  SELECT customer_id, full_name, kyc_status\n  FROM customers\n  WHERE customer_id = $1\n    AND lower(security_answer) = lower(trim($2))\n)\nSELECT\n  c.customer_id,\n  c.full_name,\n  c.kyc_status,\n  (SELECT coalesce(json_agg(json_build_object(\n      'type', a.account_type, 'last4', a.last4, 'balance', a.balance,\n      'status', a.status, 'status_reason', a.status_reason,\n      'overdraft_limit', a.overdraft_limit, 'interest_rate', a.interest_rate)\n      ORDER BY a.account_type), '[]'::json)\n   FROM accounts a WHERE a.customer_id = c.customer_id) AS accounts,\n  (SELECT coalesce(json_agg(json_build_object(\n      'type', k.card_type, 'last4', k.last4, 'status', k.status, 'expiry', k.expiry,\n      'daily_limit', k.daily_limit, 'credit_limit', k.credit_limit,\n      'outstanding', k.outstanding, 'minimum_payment', k.minimum_payment,\n      'payment_due', k.payment_due)\n      ORDER BY k.card_type DESC), '[]'::json)\n   FROM cards k WHERE k.customer_id = c.customer_id) AS cards,\n  (SELECT coalesce(json_agg(json_build_object(\n      'type', l.loan_type, 'monthly_payment', l.monthly_payment,\n      'remaining_balance', l.remaining_balance, 'next_due_date', l.next_due_date,\n      'status', l.status, 'days_past_due', l.days_past_due,\n      'interest_rate', l.interest_rate)), '[]'::json)\n   FROM loans l WHERE l.customer_id = c.customer_id) AS loans,\n  (SELECT coalesce(json_agg(json_build_object(\n      'type', t.transfer_type, 'beneficiary', t.beneficiary_name,\n      'bank', t.beneficiary_bank, 'amount', t.amount, 'fee', t.fee,\n      'initiated', t.initiated_at::date, 'expected', t.expected_completion,\n      'status', t.status, 'failure_reason', t.failure_reason)\n      ORDER BY t.initiated_at DESC), '[]'::json)\n   FROM transfers t\n   JOIN accounts a2 ON a2.account_id = t.from_account_id\n   WHERE a2.customer_id = c.customer_id\n     AND t.initiated_at > now() - interval '60 days') AS transfers,\n  (SELECT coalesce(json_agg(json_build_object(\n      'ticket_id', tk.ticket_id, 'category', tk.category,\n      'description', tk.description, 'status', tk.status,\n      'created', tk.created_at::date)\n      ORDER BY tk.created_at DESC), '[]'::json)\n   FROM tickets tk\n   WHERE tk.customer_id = c.customer_id AND tk.status <> 'resolved') AS open_tickets\nFROM c;",
+        "options": {
+          "queryReplacement": "={{ [ $json.customer_id.replace(/\\D/g, ''), $json.security_answer ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        224,
+        0
+      ],
+      "id": "40be230a-1138-43ef-a33a-9a2eb656fb18",
+      "name": "Execute a SQL query",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "UnYfMltGDGqVH2Q2",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Turn the account data into a clear answer for the agent\nconst j = $json;\n\nif (!j || !j.full_name) {\n  return { json: { result: 'NOT VERIFIED. The customer ID or security answer did not match. Do not share any account information. Ask the caller to verify again.' } };\n}\n\n// Helpers\nconst list = v => (typeof v === 'string' ? JSON.parse(v) : v) || [];\n\n// Spell out a dollar amount the way people say it out loud\nconst spokenMoney = n => {\n  const ones = ['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'];\n  const tens = ['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'];\n  const under1000 = x => {\n    const parts = [];\n    if (x >= 100) { parts.push(ones[Math.floor(x / 100)] + ' hundred'); x %= 100; }\n    if (x >= 20) { parts.push(tens[Math.floor(x / 10)] + (x % 10 ? '-' + ones[x % 10] : '')); }\n    else if (x > 0 || parts.length === 0) { parts.push(ones[x]); }\n    return parts.join(' ');\n  };\n  const words = x => {\n    if (x === 0) return 'zero';\n    const groups = [[1e9, 'billion'], [1e6, 'million'], [1e3, 'thousand']];\n    const parts = [];\n    for (const [size, name] of groups) {\n      if (x >= size) { parts.push(under1000(Math.floor(x / size)) + ' ' + name); x %= size; }\n    }\n    if (x > 0) parts.push(under1000(x));\n    return parts.join(' ');\n  };\n  const total = Math.round(Math.abs(Number(n)) * 100);\n  const dollars = Math.floor(total / 100);\n  const cents = total % 100;\n  let s = `${words(dollars)} dollar${dollars === 1 ? '' : 's'}`;\n  if (cents) s += ` and ${words(cents)} cent${cents === 1 ? '' : 's'}`;\n  return s;\n};\n\n// Every amount appears as a number AND in words, e.g. \"$25.00 (twenty-five dollars)\"\n// Amounts in words first (to be spoken), with the number in brackets\nconst money = n => (n === null || n === undefined) ? 'unknown'\n  : `${spokenMoney(n)} (${Number(n).toLocaleString('en-US', { style: 'currency', currency: 'USD' })})`;\n\nconst date = d => {\n  if (!d) return 'unknown';\n  const dt = new Date(String(d).slice(0, 10) + 'T12:00:00Z');\n  return dt.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric', timeZone: 'UTC' });\n};\nconst cap = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;\n\nconst lines = [];\nlines.push(`ACCOUNT OVERVIEW for verified customer ${j.full_name}, customer ID ${j.customer_id}.`);\nlines.push('Answer only from this data. Share only what the caller asked about, not the whole list. Do not calculate new numbers yourself.');\n\nif (j.kyc_status && j.kyc_status !== 'verified') {\n  lines.push(`Identity documents (KYC) status: ${j.kyc_status}. Search policies for what this means if relevant.`);\n}\n\n// Accounts\nconst accounts = list(j.accounts);\nlines.push('', 'ACCOUNTS:');\nif (!accounts.length) lines.push('- No accounts.');\nlet total = 0;\nfor (const a of accounts) {\n  const bal = Number(a.balance);\n  total += bal;\n  let s = `- ${cap(a.type)} account ending ${a.last4}: balance ${money(bal)}`;\n  if (bal < 0) s += ` (overdrawn by ${money(-bal)})`;\n  s += `, status ${a.status}`;\n  if (a.status_reason) s += ` (reason: ${a.status_reason})`;\n  if (a.type === 'checking') s += `, overdraft limit ${money(a.overdraft_limit)}`;\n  if (a.type === 'savings') s += `, interest rate ${Number(a.interest_rate)} percent per year`;\n  lines.push(s + '.');\n}\nif (accounts.length > 1) lines.push(`- Total across all accounts: ${money(total)}.`);\n\n// Cards\nconst cards = list(j.cards);\nlines.push('', 'CARDS:');\nif (!cards.length) lines.push('- No cards.');\nfor (const k of cards) {\n  let s = `- ${cap(k.type)} card ending ${k.last4}: status ${k.status}, expires ${date(k.expiry)}`;\n  if (k.type === 'debit') s += `, daily spending limit ${money(k.daily_limit)}`;\n  if (k.type === 'credit') {\n    s += `, credit limit ${money(k.credit_limit)}, outstanding balance ${money(k.outstanding)}`;\n    s += `, available credit ${money(Number(k.credit_limit) - Number(k.outstanding))}`;\n    s += `, minimum payment ${money(k.minimum_payment)} due ${date(k.payment_due)}`;\n  }\n  lines.push(s + '.');\n}\n\n// Loans\nconst loans = list(j.loans);\nlines.push('', 'LOANS:');\nif (!loans.length) lines.push('- No loans.');\nfor (const l of loans) {\n  let s = `- ${cap(l.type)} loan: status ${l.status}`;\n  if (l.status === 'paid_off') {\n    s += ', fully repaid';\n  } else {\n    s += `, monthly payment ${money(l.monthly_payment)}, remaining balance ${money(l.remaining_balance)}`;\n    s += `, interest rate ${Number(l.interest_rate)} percent`;\n    if (l.status === 'late') s += `, LATE: ${l.days_past_due} days past due, the missed payment was due ${date(l.next_due_date)}`;\n    else s += `, next payment due ${date(l.next_due_date)}`;\n  }\n  lines.push(s + '.');\n}\n\n// Transfers\nconst transfers = list(j.transfers);\nlines.push('', 'TRANSFERS IN THE LAST 60 DAYS:');\nif (!transfers.length) lines.push('- No transfers.');\nfor (const t of transfers) {\n  let s = `- ${cap(t.type)} transfer of ${money(t.amount)} to ${t.beneficiary} at ${t.bank}, sent ${date(t.initiated)}: status ${t.status}`;\n  if (Number(t.fee) > 0) s += `, fee ${money(t.fee)}`;\n  if (t.status === 'processing') s += `, expected to complete ${date(t.expected)}`;\n  if (t.failure_reason) s += ` (reason: ${t.failure_reason})`;\n  lines.push(s + '.');\n}\n\n// Tickets\nconst tickets = list(j.open_tickets);\nlines.push('', 'OPEN SUPPORT TICKETS:');\nif (!tickets.length) lines.push('- No open tickets.');\nfor (const tk of tickets) {\n  lines.push(`- Ticket number ${tk.ticket_id} (${tk.category}), opened ${date(tk.created)}, status ${tk.status}: ${tk.description}`);\n}\n\nreturn { json: { result: lines.join('\\n') } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "7d745e9c-4c0a-4393-9273-d909c4c42e3a",
+      "name": "Build result"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Build result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "activeVersionId": "8ef8819a-3237-4df1-b8ae-412621a2090b",
+  "versionCounter": 21,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "versionMetadata": {
+    "name": "Version 8ef8819a",
+    "description": ""
+  }
+}

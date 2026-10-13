@@ -1,0 +1,40 @@
+{
+  "type": "function",
+  "async": false,
+  "function": {
+    "name": "verify_identity",
+    "description": "Verifies the caller's identity. Use this after the caller gives their 5-digit customer ID and their security answer, before sharing any account information.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "customer_id": {
+          "type": "string",
+          "description": "The caller's 5-digit customer ID, digits only"
+        },
+        "security_answer": {
+          "type": "string",
+          "description": "The caller's answer to their security question"
+        }
+      },
+      "required": [
+        "customer_id",
+        "security_answer"
+      ]
+    }
+  },
+  "messages": [
+    {
+      "type": "request-start",
+      "content": "One moment while I check that."
+    },
+    {
+      "type": "request-failed",
+      "content": "Sorry, I'm having trouble with that right now. I can create a ticket so a specialist can help."
+    },
+    {
+      "type": "request-response-delayed",
+      "content": "Thanks for waiting, I'm still working on that.",
+      "timingMilliseconds": 4000
+    }
+  ]
+}

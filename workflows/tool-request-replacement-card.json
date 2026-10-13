@@ -1,0 +1,142 @@
+{
+  "updatedAt": "2026-10-12T12:25:01.071Z",
+  "createdAt": "2026-10-12T12:12:59.091Z",
+  "id": "VhoZe20iPhGzxXhZ",
+  "name": "Tool - request_replacement_card",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "customer_id"
+            },
+            {
+              "name": "security_answer"
+            },
+            {
+              "name": "card"
+            },
+            {
+              "name": "delivery"
+            },
+            {
+              "name": "confirmed"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "13d4baac-1787-40fe-920c-9900e047bd71",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Make the agent's inputs safe and predictable before touching the database\nconst j = $json;\n\n// card: \"credit\", \"debit\", or the last 4 digits. Never keep more than 4 digits.\nconst raw = String(j.card ?? '').toLowerCase();\nlet card = '';\nif (raw.includes('credit')) card = 'credit';\nelse if (raw.includes('debit')) card = 'debit';\nelse {\n  const digits = raw.replace(/\\D/g, '');\n  if (digits.length >= 4) card = digits.slice(-4);\n}\n\n// delivery: turn the caller's words into \"express\", \"standard\", or empty\nconst dv = String(j.delivery ?? '').toLowerCase();\nlet delivery = '';\nif (/express|fast|quick|urgent|rush|asap|two.?day|2.?day/.test(dv)) delivery = 'express';\nelse if (/standard|normal|regular|free|slow|usual/.test(dv)) delivery = 'standard';\n\n// confirmed: only an explicit yes counts\nconst yesWords = ['yes', 'y', 'true', 'confirmed', '1'];\nconst confirmed = yesWords.includes(String(j.confirmed ?? '').trim().toLowerCase()) ? 'yes' : '';\n\nreturn {\n  json: {\n    customer_id: String(j.customer_id ?? '').replace(/\\D/g, ''),\n    security_answer: String(j.security_answer ?? ''),\n    card,\n    delivery,\n    confirmed,\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "746640fa-f610-4626-b533-e502b6a55742",
+      "name": "Clean inputs"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH c AS (\n  SELECT customer_id\n  FROM customers\n  WHERE customer_id = $1\n    AND lower(security_answer) = lower(trim($2))\n),\nmy_cards AS (\n  SELECT card_id, card_type, last4, status\n  FROM cards\n  WHERE customer_id = (SELECT customer_id FROM c)\n),\ntarget AS (\n  SELECT * FROM my_cards\n  WHERE ($3 <> '' AND (last4 = $3 OR card_type = $3))\n     OR ($3 = '' AND status IN ('blocked', 'lost', 'expired')\n         AND (SELECT count(*) FROM my_cards WHERE status IN ('blocked', 'lost', 'expired')) = 1)\n),\nexisting AS (\n  SELECT r.id, r.delivery, r.fee, r.created_at\n  FROM card_replacements r\n  JOIN target t ON t.card_id = r.old_card_id\n  WHERE r.status = 'requested'\n),\ninserted AS (\n  INSERT INTO card_replacements (old_card_id, customer_id, delivery, fee)\n  SELECT t.card_id, (SELECT customer_id FROM c), $4,\n         CASE WHEN $4 = 'express' AND t.status <> 'blocked' THEN 25 ELSE 0 END\n  FROM target t\n  WHERE t.status IN ('blocked', 'lost', 'expired')\n    AND $4 IN ('standard', 'express')\n    AND $5 = 'yes'\n    AND NOT EXISTS (SELECT 1 FROM existing)\n  RETURNING id, old_card_id, customer_id, delivery, fee, created_at\n),\nlogged AS (\n  INSERT INTO card_actions (card_id, customer_id, action, reason, details)\n  SELECT old_card_id, customer_id, 'replacement_requested', delivery, 'fee ' || fee\n  FROM inserted\n  RETURNING id\n),\nfee_charged AS (\n  INSERT INTO transactions (txn_id, account_id, txn_time, description, category, amount, channel, status)\n  SELECT 'TR' || lpad(i.id::text, 6, '0'), a.account_id, now(),\n         'Express card delivery fee', 'fees', -i.fee, 'fee', 'pending'\n  FROM inserted i\n  JOIN accounts a ON a.customer_id = i.customer_id AND a.account_type = 'checking'\n  WHERE i.fee > 0\n  RETURNING txn_id\n)\nSELECT\n  (SELECT customer_id FROM c) AS customer_id,\n  (SELECT coalesce(json_agg(json_build_object('type', card_type, 'last4', last4, 'status', status)), '[]'::json) FROM my_cards) AS all_cards,\n  (SELECT coalesce(json_agg(json_build_object('type', card_type, 'last4', last4, 'status', status)), '[]'::json) FROM target) AS target,\n  (SELECT coalesce(json_agg(json_build_object('delivery', delivery, 'fee', fee, 'created_at', created_at)), '[]'::json) FROM existing) AS existing,\n  (SELECT coalesce(json_agg(json_build_object('id', id, 'delivery', delivery, 'fee', fee, 'created_at', created_at)), '[]'::json) FROM inserted) AS inserted,\n  (SELECT count(*) FROM fee_charged) AS fee_charged;",
+        "options": {
+          "queryReplacement": "={{ [ $json.customer_id, $json.security_answer, $json.card, $json.delivery, $json.confirmed ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        448,
+        0
+      ],
+      "id": "e7a77baa-f135-404f-87d6-a80774941038",
+      "name": "Execute a SQL query",
+      "credentials": {
+        "postgres": {
+          "id": "UnYfMltGDGqVH2Q2",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Turn the result into clear instructions for the agent\nconst j = $json;\nconst input = $('Clean inputs').item.json;\n\nif (!j || !j.customer_id) {\n  return { json: { result: 'NOT VERIFIED. The customer ID or security answer did not match. Do not take any action. Ask the caller to verify again.' } };\n}\n\nconst list = v => (typeof v === 'string' ? JSON.parse(v) : v) || [];\nconst all = list(j.all_cards);\nconst target = list(j.target);\nconst existing = list(j.existing);\nconst inserted = list(j.inserted);\nconst name = k => `${k.type} card ending ${k.last4}`;\nconst money = n => Number(n).toLocaleString('en-US', { style: 'currency', currency: 'USD' });\n\n// Count forward a number of business days, skipping Saturdays and Sundays\nconst addBusinessDays = (start, n) => {\n  const d = new Date(start);\n  let added = 0;\n  while (added < n) {\n    d.setDate(d.getDate() + 1);\n    const day = d.getDay();\n    if (day !== 0 && day !== 6) added++;\n  }\n  return d;\n};\nconst fmt = d => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });\nconst arrival = (delivery, from) => delivery === 'express'\n  ? `by ${fmt(addBusinessDays(from, 2))}`\n  : `between ${fmt(addBusinessDays(from, 5))} and ${fmt(addBusinessDays(from, 7))}`;\n\nconst today = new Date();\nconst eligibleStatuses = ['blocked', 'lost', 'expired'];\nlet result;\n\nif (inserted.length) {\n  // The replacement was ordered\n  const r = inserted[0];\n  const k = target[0];\n  const feeText = Number(r.fee) > 0\n    ? `The ${money(r.fee)} express fee has been added to their checking account as a pending charge.`\n    : (r.delivery === 'express' ? 'Express delivery is free because the card was blocked for fraud.' : 'Standard delivery is free.');\n  result = `DONE. A replacement for the ${name(k)} has been ordered with ${r.delivery} delivery. It should arrive ${arrival(r.delivery, new Date(r.created_at))}. ${feeText} The new card will have a new card number, so the caller should update any subscriptions or saved payments that use the old card. Tell the caller this in two or three short sentences.`;\n\n} else if (existing.length) {\n  // A replacement is already on its way\n  const r = existing[0];\n  const k = target[0];\n  const ordered = new Date(r.created_at);\n  result = `ALREADY ORDERED. A replacement for the ${name(k)} was already ordered on ${fmt(ordered)} with ${r.delivery} delivery. It should arrive ${arrival(r.delivery, ordered)}. Do not order another one. Tell the caller this.`;\n\n} else if (target.length) {\n  const k = target[0];\n  if (!eligibleStatuses.includes(k.status)) {\n    // The card is still active\n    result = `CARD IS STILL ACTIVE. The ${name(k)} is active, so it does not need replacing. If the caller lost it or it was stolen or misused, offer to block it first with block_card, then order the replacement.`;\n  } else {\n    // The same fee rule as the database: express is free if the card was blocked for fraud\n    const expressFee = k.status === 'blocked' ? 0 : 25;\n    const expressText = expressFee\n      ? `express costs ${money(expressFee)} and arrives ${arrival('express', today)}`\n      : `express is free in this case because the card was blocked for fraud, and arrives ${arrival('express', today)}`;\n\n    if (!input.delivery) {\n      // Ask which delivery they want\n      result = `CHOOSE DELIVERY. The ${name(k)} can be replaced. Ask the caller: standard delivery is free and arrives ${arrival('standard', today)}, or ${expressText}. Which would they like? Then use request_replacement_card again with the delivery they chose.`;\n    } else {\n      // Delivery chosen, now confirm\n      const fee = input.delivery === 'express' ? expressFee : 0;\n      const feeText = fee ? `, with a ${money(fee)} fee charged to your checking account` : ', free of charge';\n      result = `NOT DONE YET. Ask the caller to confirm: \"Just to confirm, you'd like a replacement for your ${name(k)} by ${input.delivery} delivery${feeText}, arriving ${arrival(input.delivery, today)}?\" Only if they clearly say yes, use request_replacement_card again with delivery set to ${input.delivery} and confirmed set to yes.`;\n    }\n  }\n\n} else {\n  const cardsText = all.length ? all.map(k => `${name(k)} (${k.status})`).join(', ') : 'none';\n  if (input.card) {\n    result = `NO MATCHING CARD. No card matches \"${input.card}\". The customer's cards are: ${cardsText}. Ask which card they mean.`;\n  } else {\n    const eligible = all.filter(k => eligibleStatuses.includes(k.status));\n    if (eligible.length > 1) {\n      result = `WHICH CARD? More than one card can be replaced: ${eligible.map(name).join(' and ')}. Ask which one, then use request_replacement_card again with that card.`;\n    } else {\n      result = `NOTHING TO REPLACE. None of the customer's cards are blocked, lost, or expired. Their cards are: ${cardsText}. If a card was lost, stolen, or misused, offer to block it first with block_card.`;\n    }\n  }\n}\n\nreturn { json: { result } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "000e0c06-752f-4902-a5df-8831071ec855",
+      "name": "Build result"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Clean inputs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean inputs": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Build result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "activeVersionId": "2254fd17-e34f-469f-a141-a69eb570801d",
+  "versionCounter": 21,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "versionMetadata": {
+    "name": "Version 2254fd17",
+    "description": ""
+  }
+}

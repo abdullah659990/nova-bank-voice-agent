@@ -1,0 +1,35 @@
+{
+  "type": "function",
+  "async": false,
+  "function": {
+    "name": "search_policies",
+    "description": "Searches Nova Bank's official policies: fees, cards, transfers, loans, disputes, fraud, accounts, overdraft, online banking, opening hours, and support. Use this for every general banking question. Pass the caller's question as a short search phrase.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "question": {
+          "type": "string",
+          "description": "The caller's question as a short search phrase"
+        }
+      },
+      "required": [
+        "question"
+      ]
+    }
+  },
+  "messages": [
+    {
+      "type": "request-start",
+      "content": "Let me look that up."
+    },
+    {
+      "type": "request-failed",
+      "content": "Sorry, I'm having trouble with that right now. I can create a ticket so a specialist can help."
+    },
+    {
+      "type": "request-response-delayed",
+      "content": "Thanks for waiting, I'm still working on that.",
+      "timingMilliseconds": 4000
+    }
+  ]
+}

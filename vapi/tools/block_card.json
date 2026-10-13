@@ -1,0 +1,52 @@
+{
+  "type": "function",
+  "async": false,
+  "function": {
+    "name": "block_card",
+    "description": "Blocks a verified customer's lost, stolen, or misused card so it can no longer be used. Pass the card (last 4 digits, or debit or credit), the reason in the caller's words, and confirmed. If you don't know which card yet, leave confirmed out; the tool says which card it found and the exact question to ask. Only after the caller clearly says yes to a specific card, set confirmed to yes.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "customer_id": {
+          "type": "string",
+          "description": "The verified 5-digit customer ID"
+        },
+        "security_answer": {
+          "type": "string",
+          "description": "The security answer the caller gave when verifying"
+        },
+        "card": {
+          "type": "string",
+          "description": "Last 4 digits of the card, or debit or credit. Leave out if only one card."
+        },
+        "reason": {
+          "type": "string",
+          "description": "Why, in the caller's words, for example lost, stolen, or charges I did not make"
+        },
+        "confirmed": {
+          "type": "string",
+          "description": "yes only if the caller clearly said yes to blocking this specific card. Otherwise leave out."
+        }
+      },
+      "required": [
+        "customer_id",
+        "security_answer"
+      ]
+    }
+  },
+  "messages": [
+    {
+      "type": "request-start",
+      "content": "One moment."
+    },
+    {
+      "type": "request-failed",
+      "content": "Sorry, I'm having trouble with that right now. I can create a ticket so a specialist can help."
+    },
+    {
+      "type": "request-response-delayed",
+      "content": "Thanks for waiting, I'm still working on that.",
+      "timingMilliseconds": 4000
+    }
+  ]
+}

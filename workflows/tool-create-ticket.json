@@ -1,0 +1,280 @@
+{
+  "updatedAt": "2026-10-12T19:44:44.802Z",
+  "createdAt": "2026-10-12T18:19:39.851Z",
+  "id": "NErRrDDH1i2hvCLA",
+  "name": "Tool - create_ticket",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "customer_id"
+            },
+            {
+              "name": "security_answer"
+            },
+            {
+              "name": "category"
+            },
+            {
+              "name": "description"
+            },
+            {
+              "name": "confirmed"
+            },
+            {
+              "name": "caller_number"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        -112
+      ],
+      "id": "b82ca301-3092-4b17-9c07-4e7da7d73e38",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Clean the inputs, and decide the ticket's category and priority\nconst j = $json;\n\n// description: one clean line, at most 500 characters\nconst description = String(j.description ?? '').replace(/\\s+/g, ' ').trim().slice(0, 500);\n\n// Look at the category hint and the description together\nconst text = `${j.category ?? ''} ${description}`.toLowerCase();\n\n// category: the first matching rule wins, so the most serious ones come first\nlet category = 'other';\nif (/fraud|not (me|them|mine)|was ?n.?t (me|them)|were ?n.?t (me|them)|did ?n.?o?t make|unauthori|stolen|scam|hack|don.?t recogni/.test(text)) category = 'fraud';\nelse if (/feedback|suggest|idea/.test(text)) category = 'feedback';\nelse if (/transfer|wire|sent money|beneficiary/.test(text)) category = 'transfer';\nelse if (/loan|mortgage|hardship|installment/.test(text)) category = 'loan';\nelse if (/fee|overdraft|refund|charged me/.test(text)) category = 'fees';\nelse if (/\\bapp\\b|log ?in|password|online|new phone|locked out/.test(text)) category = 'online banking';\nelse if (/card|limit/.test(text)) category = 'card';\nelse if (/account|frozen|dormant|close|kyc|document|verify|security answer/.test(text)) category = 'account';\nelse if (/complain|unhappy|angry|human|manager|person/.test(text)) category = 'complaint';\n\n// priority: from the bank's ticket policy\nlet priority = 'normal';\nif (category === 'fraud' || /cancel.{0,30}transfer|transfer.{0,30}cancel/.test(text)) priority = 'urgent';\nelse if (/hardship|can.?t pay|lost (my )?job|unemploy|sick|frozen|salary|payroll/.test(text)) priority = 'high';\nelse if (category === 'feedback') priority = 'low';\n\n// confirmed: only an explicit yes counts\nconst yesWords = ['yes', 'y', 'true', 'confirmed', '1'];\n\nreturn {\n  json: {\n    customer_id: String(j.customer_id ?? '').replace(/\\D/g, ''),\n    security_answer: String(j.security_answer ?? ''),\n    category,\n    priority,\n    description,\n    confirmed: yesWords.includes(String(j.confirmed ?? '').trim().toLowerCase()) ? 'yes' : '',\n    caller_number: String(j.caller_number ?? '').replace(/[^\\d+]/g, '').slice(0, 20),\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        -112
+      ],
+      "id": "62d99474-fd00-478c-8e08-8ab5e8a0ac0b",
+      "name": "Clean inputs"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH c AS (\n  SELECT customer_id\n  FROM customers\n  WHERE customer_id = $1\n    AND lower(security_answer) = lower(trim($2))\n),\nrecent AS (\n  SELECT ticket_id, priority, created_at\n  FROM tickets\n  WHERE category = $3\n    AND (\n      customer_id = (SELECT customer_id FROM c)\n      OR ((SELECT customer_id FROM c) IS NULL\n          AND $7 <> ''\n          AND description LIKE '%[Caller phone: ' || $7 || ']%')\n    )\n    AND status <> 'resolved'\n    AND created_at > now() - interval '24 hours'\n  ORDER BY created_at DESC\n  LIMIT 1\n),\ninserted AS (\n  INSERT INTO tickets (customer_id, category, priority, description, source)\n  SELECT\n    (SELECT customer_id FROM c),\n    $3,\n    $4,\n    $5\n      || CASE WHEN (SELECT customer_id FROM c) IS NULL\n              THEN ' [UNVERIFIED CALLER. Customer ID given: ' || coalesce(nullif($1, ''), 'none') || ']'\n              ELSE '' END\n      || CASE WHEN $7 <> '' THEN ' [Caller phone: ' || $7 || ']' ELSE '' END,\n    'voice_agent'\n  WHERE $6 = 'yes'\n    AND length(trim($5)) > 0\n    AND NOT EXISTS (SELECT 1 FROM recent)\n  RETURNING ticket_id, priority, description, created_at\n)\nSELECT\n  (SELECT customer_id FROM c) AS verified_customer,\n  (SELECT row_to_json(recent) FROM recent) AS recent,\n  (SELECT row_to_json(inserted) FROM inserted) AS inserted;",
+        "options": {
+          "queryReplacement": "={{ [ $json.customer_id, $json.security_answer, $json.category, $json.priority, $json.description, $json.confirmed, $json.caller_number ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        448,
+        -112
+      ],
+      "id": "ce5fdc41-f5e1-4a7a-a820-b45fc4b93f2c",
+      "name": "Execute a SQL query",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "UnYfMltGDGqVH2Q2",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Turn the result into instructions for the agent, plus the phone alert\nconst j = $json;\nconst input = $('Clean inputs').item.json;\n\nconst obj = v => (typeof v === 'string' ? (v ? JSON.parse(v) : null) : v) || null;\nconst recent = obj(j.recent);\nconst inserted = obj(j.inserted);\nconst verified = !!j.verified_customer;\n\nconst responseTime = {\n  urgent: 'within 4 hours',\n  high: 'within 24 hours',\n  normal: 'within 2 business days',\n  low: 'within 5 business days',\n};\nconst ntfyPriority = { urgent: 'urgent', high: 'high', normal: 'default', low: 'low' };\n\nconst out = { result: '', notify: false };\n\nif (inserted) {\n  // A new ticket was created\n  const unverifiedNote = verified\n    ? ''\n    : ' Because the caller is not verified, the specialist will confirm their identity before discussing any account details.';\n  out.result = `DONE. Ticket number ${inserted.ticket_id} has been created with ${inserted.priority} priority. A specialist will contact the customer ${responseTime[inserted.priority]}.${unverifiedNote} Tell the caller the ticket number and when to expect contact, in one or two short sentences.`;\n\n  // Details for the phone alert\n  out.notify = true;\n  out.ntfy_title = `Ticket #${inserted.ticket_id}: ${inserted.priority.toUpperCase()} (${input.category})`;\n  out.ntfy_message = `${verified ? 'Customer ' + j.verified_customer : 'UNVERIFIED caller'}: ${input.description}`;\n  out.ntfy_priority = ntfyPriority[inserted.priority];\n  out.ntfy_tags = inserted.priority === 'urgent' ? 'rotating_light' : 'ticket';\n\n} else if (recent) {\n  // The same customer already has a recent open ticket on this topic\n  out.result = `ALREADY OPEN. This customer already has ticket number ${recent.ticket_id} about ${input.category}, opened in the last 24 hours with ${recent.priority} priority. A specialist will contact them ${responseTime[recent.priority]}. Do not create another one. Tell the caller this.`;\n\n} else if (!input.description) {\n  // The agent forgot to describe the problem\n  out.result = 'NEED A SUMMARY. Write a short summary of the caller\\'s problem and what they want (one or two sentences) in description, then use create_ticket again.';\n\n} else {\n  // Ask the caller first\n  out.result = `NOT DONE YET. Ask the caller to confirm: \"I'll create a ticket so a specialist can follow up about this. They'll contact you ${responseTime[input.priority]}. Is that okay?\" Only if they say yes, use create_ticket again with the same description and confirmed set to yes.`;\n}\n\nreturn { json: out };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        -112
+      ],
+      "id": "49d5a11e-8d82-4058-85a0-2d21c20916f8",
+      "name": "Build result"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "68389559-0b4a-4839-b259-373e2bd049dd",
+              "leftValue": "={{ $json.notify }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        896,
+        -112
+      ],
+      "id": "4af51908-be9b-4092-8e14-a1584dd49205",
+      "name": "New ticket?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://ntfy.sh/YOUR-NTFY-TOPIC",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Title",
+              "value": "={{ $json.ntfy_title }}"
+            },
+            {
+              "name": "Priority",
+              "value": "={{ $json.ntfy_priority }}"
+            },
+            {
+              "name": "Tags",
+              "value": "={{ $json.ntfy_tags }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "text/plain",
+        "body": "={{ $json.ntfy_message }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1120,
+        -192
+      ],
+      "id": "ad20b220-95ed-43bb-b495-0948216b5cca",
+      "name": "Alert on phone",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "221f4ef1-7c6c-4795-8943-8c215bf42b71",
+              "name": "result",
+              "value": "={{ $('Build result').item.json.result }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.5,
+      "position": [
+        1344,
+        -112
+      ],
+      "id": "1cd61600-8add-4671-826a-12dc98af5dd5",
+      "name": "Final result"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Clean inputs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean inputs": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Build result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build result": {
+      "main": [
+        [
+          {
+            "node": "New ticket?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "New ticket?": {
+      "main": [
+        [
+          {
+            "node": "Alert on phone",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Final result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Alert on phone": {
+      "main": [
+        [
+          {
+            "node": "Final result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "activeVersionId": "eb99cd9f-5bc9-45cc-8052-1ab467a31cb5",
+  "versionCounter": 61,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "versionMetadata": {
+    "name": "Version eb99cd9f",
+    "description": ""
+  }
+}

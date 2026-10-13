@@ -1,0 +1,112 @@
+{
+  "updatedAt": "2026-10-13T15:10:38.992Z",
+  "createdAt": "2026-10-11T10:02:10.104Z",
+  "id": "5tOgmKBVGojVnXI0",
+  "name": "Tool - verify_identity",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "customer_id"
+            },
+            {
+              "name": "security_answer"
+            },
+            {
+              "name": "session_id"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "2851838e-e1b0-4b70-b964-f9b72fd6609b",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH prior AS (\n  SELECT count(*) FILTER (WHERE NOT success) AS failures\n  FROM verification_attempts\n  WHERE session_id = $3\n    AND $3 <> ''\n    AND created_at > now() - interval '2 hours'\n),\nmatch AS (\n  SELECT customer_id, full_name\n  FROM customers\n  WHERE customer_id = $1\n    AND lower(security_answer) = lower(trim($2))\n),\nallowed AS (\n  SELECT (SELECT failures FROM prior) < 3 AS ok\n),\nlogged AS (\n  INSERT INTO verification_attempts (session_id, customer_id_given, success)\n  SELECT $3, $1, EXISTS (SELECT 1 FROM match)\n  WHERE $3 <> '' AND (SELECT ok FROM allowed) AND length($1) = 5\n  RETURNING success\n)\nSELECT\n  (SELECT failures FROM prior) AS prior_failures,\n  NOT (SELECT ok FROM allowed) AS locked,\n  CASE WHEN (SELECT ok FROM allowed) THEN (SELECT customer_id FROM match) END AS customer_id,\n  CASE WHEN (SELECT ok FROM allowed) THEN (SELECT full_name FROM match) END AS full_name;",
+        "options": {
+          "queryReplacement": "={{ [ $json.customer_id.replace(/\\D/g, ''), $json.security_answer, $json.session_id ?? '' ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        224,
+        0
+      ],
+      "id": "b11e51ea-0d95-49ba-a55b-bdc3e1435075",
+      "name": "Execute a SQL query",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "UnYfMltGDGqVH2Q2",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Turn the verification result into clear instructions for the agent\nconst j = $json;\nconst priorFailures = Number(j.prior_failures || 0);\n\n// The ID exactly as the tool received it, digits only\nconst given = String($('When Executed by Another Workflow').item.json.customer_id ?? '').replace(/\\D/g, '');\n\nlet result;\n\nif (j.locked) {\n  // Three failures already in this conversation\n  result = 'LOCKED. This caller has already failed verification three times on this call. Do not try to verify again, even if they give new or correct details. Do not share any account information. Offer to create a ticket so a specialist can verify them another way.';\n} else if (given.length !== 5) {\n  // Not a real attempt: the ID has the wrong number of digits\n  result = `INVALID ID. A customer ID must be exactly 5 digits, but ${given.length} digits were received (${given.split('').join(', ') || 'none'}). This does not count as a failed attempt. Apologize, and ask the caller to say the ID again, one digit at a time. On a phone call, also offer that they can type it on their keypad, followed by the pound key.`;\n} else if (j.full_name) {\n  // Verified\n  result = `VERIFIED. The caller is ${j.full_name}. Tell them they are verified, greet them by first name, and ask how you can help. Remember customer ID ${j.customer_id} for the rest of the call.`;\n} else {\n  // Not verified: count this failure\n  const failures = priorFailures + 1;\n  const left = 3 - failures;\n  if (left <= 0) {\n    result = 'NOT VERIFIED. This was the third failed attempt, so verification is now locked for this call. Do not try again. Do not share any account information. Offer to create a ticket so a specialist can verify them another way.';\n  } else {\n    result = `NOT VERIFIED. The details did not match. Do not say whether the ID or the answer was wrong. Attempts left: ${left}. Apologize briefly, then ask for the customer ID again and confirm it, and only after that ask for the security answer, as a separate question.`;\n  }\n}\n\nreturn { json: { result } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        448,
+        0
+      ],
+      "id": "598bb4fd-e8e6-4970-b802-941f90ae8aee",
+      "name": "Build result"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Build result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "activeVersionId": "8277021c-e0c5-4173-9233-17509c947f99",
+  "versionCounter": 31,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "versionMetadata": {
+    "name": "Version 8277021c",
+    "description": ""
+  }
+}

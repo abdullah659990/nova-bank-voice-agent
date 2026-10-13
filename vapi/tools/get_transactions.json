@@ -1,0 +1,56 @@
+{
+  "type": "function",
+  "async": false,
+  "function": {
+    "name": "get_transactions",
+    "description": "Only use this after verify_identity has returned VERIFIED in this call. Gets a verified customer's transactions. Optional filters: days (how far back, default 30, maximum 180), search (a merchant name or a category), account_type (checking or savings), and limit (default 10). Returns totals, possible duplicate charges, which card was used for card payments, and a reference for each transaction.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "customer_id": {
+          "type": "string",
+          "description": "The verified 5-digit customer ID"
+        },
+        "security_answer": {
+          "type": "string",
+          "description": "The security answer the caller gave when verifying"
+        },
+        "days": {
+          "type": "number",
+          "description": "How many days back to look. Leave out for 30."
+        },
+        "search": {
+          "type": "string",
+          "description": "A merchant name like amazon, or a category like groceries, income, dining, utilities, housing, cash, fees, transfer. Leave out for all."
+        },
+        "account_type": {
+          "type": "string",
+          "enum": [
+            "checking",
+            "savings"
+          ],
+          "description": "Leave out for both accounts."
+        },
+        "limit": {
+          "type": "number",
+          "description": "How many transactions to list. Leave out for 10."
+        }
+      },
+      "required": [
+        "customer_id",
+        "security_answer"
+      ]
+    }
+  },
+  "messages": [
+    {
+      "type": "request-failed",
+      "content": "Sorry, I'm having trouble with that right now. I can create a ticket so a specialist can help."
+    },
+    {
+      "type": "request-response-delayed",
+      "content": "Thanks for waiting, I'm still working on that.",
+      "timingMilliseconds": 4000
+    }
+  ]
+}

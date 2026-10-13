@@ -1,0 +1,14 @@
+# Python
+.venv/
+__pycache__/
+
+# Raw n8n exports (may contain private values). Commit only ./workflows after sanitizing.
+exports-raw/
+
+# Local notes and secrets
+.env
+*.secret
+csv/
+
+# macOS
+.DS_Store

@@ -1,0 +1,36 @@
+{
+  "type": "function",
+  "async": false,
+  "function": {
+    "name": "get_account_overview",
+    "description": "Only use this after verify_identity has returned VERIFIED in this call. Gets a verified customer's full account overview: account balances and status, cards and their status and limits, loans and payment status, transfers from the last 60 days, and open support tickets. Pass the same customer ID and security answer the caller used to verify.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "customer_id": {
+          "type": "string",
+          "description": "The verified 5-digit customer ID"
+        },
+        "security_answer": {
+          "type": "string",
+          "description": "The security answer the caller gave when verifying"
+        }
+      },
+      "required": [
+        "customer_id",
+        "security_answer"
+      ]
+    }
+  },
+  "messages": [
+    {
+      "type": "request-failed",
+      "content": "Sorry, I'm having trouble with that right now. I can create a ticket so a specialist can help."
+    },
+    {
+      "type": "request-response-delayed",
+      "content": "Thanks for waiting, I'm still working on that.",
+      "timingMilliseconds": 4000
+    }
+  ]
+}

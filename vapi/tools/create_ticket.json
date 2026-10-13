@@ -1,0 +1,51 @@
+{
+  "type": "function",
+  "async": false,
+  "function": {
+    "name": "create_ticket",
+    "description": "Creates a support ticket so a human specialist follows up. Use it when the caller asks for a human, needs something you cannot do, has a complaint, reports fraud, cannot be verified, or asks something you have no information about. Works for verified and unverified callers. Pass a short, clear summary in description. The tool decides the priority. Only after the caller agrees, set confirmed to yes.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "customer_id": {
+          "type": "string",
+          "description": "The customer ID the caller gave, if any"
+        },
+        "security_answer": {
+          "type": "string",
+          "description": "The security answer the caller gave, if any"
+        },
+        "category": {
+          "type": "string",
+          "description": "A one-word topic hint, like fraud, card, transfer, loan, fees, account, complaint"
+        },
+        "description": {
+          "type": "string",
+          "description": "A short summary: what happened, what the caller wants, and what was already done"
+        },
+        "confirmed": {
+          "type": "string",
+          "description": "yes only if the caller agreed to the ticket. Otherwise leave out."
+        }
+      },
+      "required": [
+        "description"
+      ]
+    }
+  },
+  "messages": [
+    {
+      "type": "request-start",
+      "content": "One moment while I set that up."
+    },
+    {
+      "type": "request-failed",
+      "content": "Sorry, I'm having trouble creating that ticket right now. Please call back shortly, or visit any branch for help."
+    },
+    {
+      "type": "request-response-delayed",
+      "content": "Thanks for waiting, I'm still working on that.",
+      "timingMilliseconds": 4000
+    }
+  ]
+}

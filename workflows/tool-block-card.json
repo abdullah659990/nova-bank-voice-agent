@@ -1,0 +1,143 @@
+{
+  "updatedAt": "2026-10-13T16:41:49.954Z",
+  "createdAt": "2026-10-12T09:50:18.482Z",
+  "id": "6LAz7zePjc0pSCTM",
+  "name": "Tool - block_card",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "customer_id"
+            },
+            {
+              "name": "security_answer"
+            },
+            {
+              "name": "card"
+            },
+            {
+              "name": "reason"
+            },
+            {
+              "name": "confirmed"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "5d93afb4-f0bd-4ae1-b4e8-a800c191a94a",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Make the agent's inputs safe and predictable before touching the database\nconst j = $json;\n\n// card: \"credit\", \"debit\", or the last 4 digits. Never keep more than 4 digits.\nconst raw = String(j.card ?? '').toLowerCase();\nlet card = '';\nif (raw.includes('credit')) card = 'credit';\nelse if (raw.includes('debit')) card = 'debit';\nelse {\n  const digits = raw.replace(/\\D/g, '');\n  if (digits.length >= 4) card = digits.slice(-4);\n}\n\n// reason: turn the caller's words into one of four values\nconst r = String(j.reason ?? '').toLowerCase();\nlet reason = 'other';\nif (/stol|theft|thief|rob/.test(r)) reason = 'stolen';\nelse if (/lost|lose|missing|misplac|can.?t find/.test(r)) reason = 'lost';\nelse if (/fraud|unauthori|recogni|scam|suspicious|hack|not (me|them|mine)|was ?n.?t (me|them)|were ?n.?t (me|them)|did ?n.?o?t (make|authori)|didn.?t make/.test(r)) reason = 'fraud';\n\n// confirmed: only an explicit yes counts\nconst yesWords = ['yes', 'y', 'true', 'confirmed', '1'];\nconst confirmed = yesWords.includes(String(j.confirmed ?? '').trim().toLowerCase()) ? 'yes' : '';\n\nreturn {\n  json: {\n    customer_id: String(j.customer_id ?? '').replace(/\\D/g, ''),\n    security_answer: String(j.security_answer ?? ''),\n    card,\n    reason,\n    confirmed,\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "b630c17e-2ffc-4d13-a79c-9a3baee6a203",
+      "name": "Clean inputs"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH c AS (\n  SELECT customer_id\n  FROM customers\n  WHERE customer_id = $1\n    AND lower(security_answer) = lower(trim($2))\n),\nmy_cards AS (\n  SELECT card_id, card_type, last4, status\n  FROM cards\n  WHERE customer_id = (SELECT customer_id FROM c)\n),\ntarget AS (\n  SELECT * FROM my_cards\n  WHERE ($3 <> '' AND (last4 = $3 OR card_type = $3))\n     OR ($3 = '' AND status = 'active'\n         AND (SELECT count(*) FROM my_cards WHERE status = 'active') = 1)\n),\nupdated AS (\n  UPDATE cards k\n  SET status = CASE WHEN $4 IN ('lost', 'stolen') THEN 'lost' ELSE 'blocked' END\n  FROM target t\n  WHERE k.card_id = t.card_id\n    AND t.status = 'active'\n    AND $5 = 'yes'\n  RETURNING k.card_id, k.card_type, k.last4, k.status\n),\nlogged AS (\n  INSERT INTO card_actions (card_id, customer_id, action, reason)\n  SELECT card_id, (SELECT customer_id FROM c), 'block', $4\n  FROM updated\n  RETURNING id\n)\nSELECT\n  (SELECT customer_id FROM c) AS customer_id,\n  (SELECT coalesce(json_agg(json_build_object('type', card_type, 'last4', last4, 'status', status)), '[]'::json) FROM my_cards) AS all_cards,\n  (SELECT coalesce(json_agg(json_build_object('type', card_type, 'last4', last4, 'status', status)), '[]'::json) FROM target) AS target_before,\n  (SELECT coalesce(json_agg(json_build_object('type', card_type, 'last4', last4, 'status', status)), '[]'::json) FROM updated) AS updated,\n  (SELECT count(*) FROM logged) AS logged;",
+        "options": {
+          "queryReplacement": "={{ [ $json.customer_id, $json.security_answer, $json.card, $json.reason, $json.confirmed ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        448,
+        0
+      ],
+      "id": "3f5789d8-462f-4af9-a4d7-1ada03cb80fc",
+      "name": "Execute a SQL query",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "UnYfMltGDGqVH2Q2",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Turn the result into clear instructions for the agent\nconst j = $json;\nconst input = $('Clean inputs').item.json;\n\nif (!j || !j.customer_id) {\n  return { json: { result: 'NOT VERIFIED. The customer ID or security answer did not match. Do not take any action. Ask the caller to verify again.' } };\n}\n\nconst list = v => (typeof v === 'string' ? JSON.parse(v) : v) || [];\nconst all = list(j.all_cards);\nconst target = list(j.target_before);\nconst updated = list(j.updated);\nconst name = k => `${k.type} card ending ${k.last4}`;\nconst cardsText = all.length ? all.map(k => `${name(k)} (${k.status})`).join(', ') : 'none';\n\nlet result;\n\nif (updated.length) {\n  // The card was blocked\n  const k = updated[0];\n  result = `DONE. The ${name(k)} is now blocked (status: ${k.status}). It can no longer be used, and it cannot be unblocked. In the same reply, tell the caller it is blocked, and then ask the next question: if this was for fraud, ask whether to create an urgent fraud ticket for the charges they did not make; otherwise, ask whether they would like a replacement card.`;} else if (target.length) {\n  const k = target[0];\n  if (k.status !== 'active') {\n    // Already blocked, lost, or expired\n    result = `NO ACTION NEEDED. The ${name(k)} is already ${k.status}, so it cannot be used. Tell the caller this.`;\n  } else {\n    // Found the card, but the caller hasn't confirmed yet\n    result = `NOT DONE YET. Ask the caller to confirm: \"Just to confirm, you want me to block your ${name(k)}? Once blocked, it can't be used again.\" Only if they clearly say yes, use block_card again with confirmed set to yes.`;\n  }\n} else if (input.card) {\n  // The caller named a card that doesn't match\n  result = `NO MATCHING CARD. No active card matches \"${input.card}\". The customer's cards are: ${cardsText}. Ask which card they mean.`;\n} else {\n  const active = all.filter(k => k.status === 'active');\n  if (active.length > 1) {\n    // More than one active card, and none was specified\n    result = `WHICH CARD? The customer has more than one active card: ${active.map(name).join(' and ')}. Ask which one to block, then use block_card again with that card.`;\n  } else {\n    // No active cards at all\n    result = `NO ACTIVE CARDS. The customer has no active card to block. Their cards are: ${cardsText}. Tell the caller this.`;\n  }\n}\n\nreturn { json: { result } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "1950f778-e1e2-4c7a-ad21-b1f18382da06",
+      "name": "Build result"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Clean inputs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean inputs": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Build result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "activeVersionId": "68505c8b-c653-4f5b-b710-6f8fa1cee04a",
+  "versionCounter": 29,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "versionMetadata": {
+    "name": null,
+    "description": null
+  }
+}

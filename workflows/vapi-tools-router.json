@@ -1,0 +1,1101 @@
+{
+  "updatedAt": "2026-10-12T22:09:31.605Z",
+  "createdAt": "2026-10-11T12:03:11.573Z",
+  "id": "u1TPtVN5em7J3JVg",
+  "name": "Vapi tools router",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "vapi-tools",
+        "authentication": "headerAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -3808,
+        512
+      ],
+      "id": "5864a1db-319f-4459-9a78-168cdc6e9abb",
+      "name": "Webhook",
+      "webhookId": "91fb1848-902f-4898-8fca-84bde0e6a6a2",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "xE6Y8ADZGCDmLVlu",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.tool_name }}",
+                    "rightValue": "verify_identity",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "38486d77-7416-4c9a-a5df-058c80f1beaa"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "verify_identity"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "47b7a9bc-a86c-4019-b248-74b143dbf642",
+                    "leftValue": "={{ $json.tool_name }}",
+                    "rightValue": "search_policies",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "search_policies"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c7d04f19-36d4-4e69-9404-a7a5e71b3959",
+                    "leftValue": "={{ $json.tool_name }}",
+                    "rightValue": "get_account_overview",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "get_account_overview"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "841a672c-cead-4937-9217-83223006e2bd",
+                    "leftValue": "={{ $json.tool_name }}",
+                    "rightValue": "get_transactions",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "get_transactions"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "1e1f3009-13f3-46b7-ba34-e798d5b0c25d",
+                    "leftValue": "={{ $json.tool_name }}",
+                    "rightValue": "block_card",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "block_card"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "31787657-b036-419f-b85b-0bb4f7b7fb5b",
+                    "leftValue": "={{ $json.tool_name }}",
+                    "rightValue": "request_replacement_card",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "request_replacement_card"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "7b77a191-2e46-42af-ba28-c14cd72ed78c",
+                    "leftValue": "={{ $json.tool_name }}",
+                    "rightValue": "dispute_transaction",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "dispute_transaction"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "91bd8b1d-d589-44d6-951d-47bbcfa6232f",
+                    "leftValue": "={{ $json.tool_name }}",
+                    "rightValue": "create_ticket",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "create_ticket"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra"
+        }
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -3360,
+        400
+      ],
+      "id": "f26dad96-bce4-4d2d-b206-4c946b0f3601",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "5tOgmKBVGojVnXI0",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/5tOgmKBVGojVnXI0",
+          "cachedResultName": "Tool - verify_identity"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "customer_id": "={{ $json.args.customer_id }}",
+            "security_answer": "={{ $json.args.security_answer }}",
+            "session_id": "={{ String($json.call_id ?? '') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "customer_id",
+              "displayName": "customer_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "security_answer",
+              "displayName": "security_answer",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "session_id",
+              "displayName": "session_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        -2240,
+        -256
+      ],
+      "id": "62f2e165-2526-44c0-8be5-95c0b20ea9b2",
+      "name": "Run verify_identity"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { results: [ { toolCallId: $('Extract tool call').item.json.tool_call_id, result: $json.result } ] } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -1408,
+        512
+      ],
+      "id": "bb346191-923f-4361-82a2-255212b1a2ce",
+      "name": "Reply to Vapi"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { results: [ { toolCallId: $('Extract tool call').item.json.tool_call_id, result: 'This tool is not available. Tell the caller you cannot do that right now and that a specialist can help.' } ] } }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.5,
+      "position": [
+        -2240,
+        1280
+      ],
+      "id": "b755c8fd-3ca0-482d-aeed-5dd44de7b584",
+      "name": "Reply unknown tool"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Read Vapi's tool request and keep only what we need\nconst message = $json.body?.message || {};\nconst call = message.toolCallList?.[0] || {};\nconst fn = call.function || {};\n\n// The AI's filled-in blanks. Vapi may send them as text or as an object.\nlet args = fn['arguments'] ?? {};\nif (typeof args === 'string') {\n  try {\n    args = JSON.parse(args);\n  } catch (e) {\n    args = {};\n  }\n}\n\nreturn {\n  json: {\n    tool_name: fn.name || '',\n    tool_call_id: call.id || '',\n    args: args,\n    caller_number: message.call?.customer?.number || '',\n    call_id: message.call?.id || '',\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -3584,
+        512
+      ],
+      "id": "57305bf1-237f-4da4-8919-bc71e0feb3cf",
+      "name": "Extract tool call"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "vKBsQKx6vVs6DJXD",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/vKBsQKx6vVs6DJXD",
+          "cachedResultName": "Tool - search_policies"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "question": "={{ $json.args.question }}"
+          },
+          "matchingColumns": [
+            "question"
+          ],
+          "schema": [
+            {
+              "id": "question",
+              "displayName": "question",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        -2240,
+        -64
+      ],
+      "id": "af1f369c-a9f4-4223-9428-d0722d442edf",
+      "name": "Run search_policies"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "unCPxmqIyzTNQfdV",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/unCPxmqIyzTNQfdV",
+          "cachedResultName": "Tool - get_account_overview"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "customer_id": "={{ $json.args.customer_id }}",
+            "security_answer": "={{ $json.args.security_answer }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "customer_id",
+              "displayName": "customer_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "security_answer",
+              "displayName": "security_answer",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        -2240,
+        128
+      ],
+      "id": "f3d5722c-843b-45da-9e5f-416c5b1efd0b",
+      "name": "Run get_account_overview"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "NFTSqQL2biy6mDeI",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/NFTSqQL2biy6mDeI",
+          "cachedResultName": "Tool - get_transactions"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "customer_id": "={{ String($json.args.customer_id ?? '') }}",
+            "security_answer": "={{ String($json.args.security_answer ?? '') }}",
+            "days": "={{ String($json.args.days ?? '') }}",
+            "search": "={{ String($json.args.search ?? '') }}",
+            "account_type": "={{ String($json.args.account_type ?? '') }}",
+            "limit": "={{ String($json.args.limit ?? '') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "customer_id",
+              "displayName": "customer_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "security_answer",
+              "displayName": "security_answer",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "days",
+              "displayName": "days",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "search",
+              "displayName": "search",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "account_type",
+              "displayName": "account_type",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "limit",
+              "displayName": "limit",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {
+          "waitForSubWorkflow": true
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        -2240,
+        320
+      ],
+      "id": "46a2be56-7c15-4192-a538-ba883901b831",
+      "name": "Run get_transactions"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "6LAz7zePjc0pSCTM",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/6LAz7zePjc0pSCTM",
+          "cachedResultName": "Tool - block_card"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "customer_id": "={{ String($json.args.customer_id ?? '') }}",
+            "security_answer": "={{ String($json.args.security_answer ?? '') }}",
+            "card": "={{ String($json.args.card ?? '') }}",
+            "reason": "={{ String($json.args.reason ?? '') }}",
+            "confirmed": "={{ String($json.args.confirmed ?? '') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "customer_id",
+              "displayName": "customer_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "security_answer",
+              "displayName": "security_answer",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "card",
+              "displayName": "card",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "confirmed",
+              "displayName": "confirmed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        -2240,
+        512
+      ],
+      "id": "afef8f6f-0599-491a-948f-bebb148dcb37",
+      "name": "Run block_card"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "VhoZe20iPhGzxXhZ",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/VhoZe20iPhGzxXhZ",
+          "cachedResultName": "Tool - request_replacement_card"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "customer_id": "={{ String($json.args.customer_id ?? '') }}",
+            "security_answer": "={{ String($json.args.security_answer ?? '') }}",
+            "card": "={{ String($json.args.card ?? '') }}",
+            "delivery": "={{ String($json.args.delivery ?? '') }}",
+            "confirmed": "={{ String($json.args.confirmed ?? '') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "customer_id",
+              "displayName": "customer_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "security_answer",
+              "displayName": "security_answer",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "card",
+              "displayName": "card",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "delivery",
+              "displayName": "delivery",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "confirmed",
+              "displayName": "confirmed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        -2240,
+        704
+      ],
+      "id": "e8441e7e-aabc-409b-b7ac-583202f71b35",
+      "name": "Run request_replacement_card"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "HLxXzqZXysfPFX6f",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/HLxXzqZXysfPFX6f",
+          "cachedResultName": "Tool - dispute_transaction"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "customer_id": "={{ String($json.args.customer_id ?? '') }}",
+            "security_answer": "={{ String($json.args.security_answer ?? '') }}",
+            "reference": "={{ String($json.args.reference ?? '') }}",
+            "reason": "={{ String($json.args.reason ?? '') }}",
+            "confirmed": "={{ String($json.args.confirmed ?? '') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "customer_id",
+              "displayName": "customer_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "security_answer",
+              "displayName": "security_answer",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "reference",
+              "displayName": "reference",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "reason",
+              "displayName": "reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "confirmed",
+              "displayName": "confirmed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        -2240,
+        896
+      ],
+      "id": "c8011e08-b389-4cc6-8c80-058503a7f200",
+      "name": "Run dispute_transaction"
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "value": "NErRrDDH1i2hvCLA",
+          "mode": "list",
+          "cachedResultUrl": "/workflow/NErRrDDH1i2hvCLA",
+          "cachedResultName": "Tool - create_ticket"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "customer_id": "={{ String($json.args.customer_id ?? '') }}",
+            "security_answer": "={{ String($json.args.security_answer ?? '') }}",
+            "category": "={{ String($json.args.category ?? '') }}",
+            "description": "={{ String($json.args.description ?? '') }}",
+            "confirmed": "={{ String($json.args.confirmed ?? '') }}",
+            "caller_number": "={{ String($json.caller_number ?? '') }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "customer_id",
+              "displayName": "customer_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "security_answer",
+              "displayName": "security_answer",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "category",
+              "displayName": "category",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "description",
+              "displayName": "description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "confirmed",
+              "displayName": "confirmed",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            },
+            {
+              "id": "caller_number",
+              "displayName": "caller_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "canBeUsedToMatch": true,
+              "type": "string",
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.4,
+      "position": [
+        -2240,
+        1088
+      ],
+      "id": "a43f8446-3704-49dd-afc4-9a90053162dc",
+      "name": "Run create_ticket"
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Extract tool call",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Run verify_identity",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Run search_policies",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Run get_account_overview",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Run get_transactions",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Run block_card",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Run request_replacement_card",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Run dispute_transaction",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Run create_ticket",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Reply unknown tool",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run verify_identity": {
+      "main": [
+        [
+          {
+            "node": "Reply to Vapi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract tool call": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run search_policies": {
+      "main": [
+        [
+          {
+            "node": "Reply to Vapi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run get_account_overview": {
+      "main": [
+        [
+          {
+            "node": "Reply to Vapi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run get_transactions": {
+      "main": [
+        [
+          {
+            "node": "Reply to Vapi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run block_card": {
+      "main": [
+        [
+          {
+            "node": "Reply to Vapi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run request_replacement_card": {
+      "main": [
+        [
+          {
+            "node": "Reply to Vapi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run dispute_transaction": {
+      "main": [
+        [
+          {
+            "node": "Reply to Vapi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run create_ticket": {
+      "main": [
+        [
+          {
+            "node": "Reply to Vapi",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "activeVersionId": "06beac63-e58d-4917-acb0-08979c766085",
+  "versionCounter": 209,
+  "triggerCount": 1,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "versionMetadata": {
+    "name": "Version 06beac63",
+    "description": ""
+  }
+}

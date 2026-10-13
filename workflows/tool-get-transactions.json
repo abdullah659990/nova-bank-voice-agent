@@ -1,0 +1,146 @@
+{
+  "updatedAt": "2026-10-13T16:26:42.191Z",
+  "createdAt": "2026-10-11T19:42:40.556Z",
+  "id": "NFTSqQL2biy6mDeI",
+  "name": "Tool - get_transactions",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "customer_id"
+            },
+            {
+              "name": "security_answer"
+            },
+            {
+              "name": "days"
+            },
+            {
+              "name": "search"
+            },
+            {
+              "name": "account_type"
+            },
+            {
+              "name": "limit"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "4e4d84cb-754d-4104-8123-609fea583da9",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Make the agent's inputs safe and predictable before querying the database\nconst j = $json;\n\n// days: a whole number between 1 and 180, default 30\nconst days = Math.min(Math.max(parseInt(j.days, 10) || 30, 1), 180);\n\n// limit: how many transactions to list, between 1 and 25, default 10\nconst limit = Math.min(Math.max(parseInt(j.limit, 10) || 10, 1), 25);\n\n// search: plain lowercase text, at most 50 characters\nlet search = String(j.search ?? '').trim().toLowerCase().slice(0, 50);\n\n// Translate everyday words into the categories used in the data.\n// An empty value means \"no filter\" (show everything).\nconst synonyms = {\n  salary: 'income', paycheck: 'income', payroll: 'income', wages: 'income', pay: 'income', deposit: 'income',\n  rent: 'housing', mortgage: 'housing',\n  atm: 'cash', withdrawal: 'cash',\n  food: 'dining', restaurant: 'dining', restaurants: 'dining', coffee: 'dining',\n  gas: 'fuel', petrol: 'fuel',\n  bills: 'utilities', bill: 'utilities', electricity: 'utilities', internet: 'utilities', phone: 'utilities',\n  subscription: 'subscriptions', fee: 'fees',\n  charges: '', charge: '', unrecognized: '', unknown: '', duplicate: '', duplicates: '', all: '', everything: '',\n};\nif (search in synonyms) search = synonyms[search];\n\n// account_type: only \"checking\" or \"savings\" are allowed, otherwise no filter\nconst acct = String(j.account_type ?? '').trim().toLowerCase();\n\nreturn {\n  json: {\n    customer_id: String(j.customer_id ?? '').replace(/\\D/g, ''),\n    security_answer: String(j.security_answer ?? ''),\n    days,\n    limit,\n    search,\n    account_type: ['checking', 'savings'].includes(acct) ? acct : '',\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "d9c7f312-b477-4634-842c-519aaa6607ce",
+      "name": "Clean inputs"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH c AS (\n  SELECT customer_id\n  FROM customers\n  WHERE customer_id = $1\n    AND lower(security_answer) = lower(trim($2))\n),\ntx AS (\n  SELECT t.txn_id, t.txn_time, t.description, t.category, t.amount,\n         t.status, t.channel, a.account_type, a.last4,\n         CASE WHEN t.channel = 'card' THEN k.last4 END AS card_last4,\n         CASE WHEN t.channel = 'card' THEN k.status END AS card_status\n  FROM accounts a\n  JOIN transactions t ON t.account_id = a.account_id\n  LEFT JOIN cards k ON k.account_id = a.account_id AND k.card_type = 'debit'\n  WHERE a.customer_id = (SELECT customer_id FROM c)\n    AND t.txn_time > now() - make_interval(days => $3::int)\n    AND (coalesce($4, '') = ''\n         OR t.description ILIKE '%' || $4 || '%'\n         OR t.category ILIKE $4)\n    AND (coalesce($5, '') = '' OR a.account_type = $5)\n  ORDER BY t.txn_time DESC\n  LIMIT 200\n)\nSELECT\n  (SELECT customer_id FROM c) AS customer_id,\n  (SELECT coalesce(json_agg(tx ORDER BY tx.txn_time DESC), '[]'::json) FROM tx) AS transactions;",
+        "options": {
+          "queryReplacement": "={{ [ $json.customer_id, $json.security_answer, String($json.days), $json.search, $json.account_type ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        448,
+        0
+      ],
+      "id": "81dd60ed-09d2-4a68-a39a-3a1e0b70597e",
+      "name": "Execute a SQL query",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "UnYfMltGDGqVH2Q2",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Turn the transactions into a clear answer for the agent\nconst j = $json;\nconst input = $('Clean inputs').item.json;\n\nif (!j || !j.customer_id) {\n  return { json: { result: 'NOT VERIFIED. The customer ID or security answer did not match. Do not share any account information. Ask the caller to verify again.' } };\n}\n\nconst txs = (typeof j.transactions === 'string' ? JSON.parse(j.transactions) : j.transactions) || [];\n\n// Spell out a dollar amount the way people say it out loud\nconst spokenMoney = n => {\n  const ones = ['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'];\n  const tens = ['','','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'];\n  const under1000 = x => {\n    const parts = [];\n    if (x >= 100) { parts.push(ones[Math.floor(x / 100)] + ' hundred'); x %= 100; }\n    if (x >= 20) { parts.push(tens[Math.floor(x / 10)] + (x % 10 ? '-' + ones[x % 10] : '')); }\n    else if (x > 0 || parts.length === 0) { parts.push(ones[x]); }\n    return parts.join(' ');\n  };\n  const words = x => {\n    if (x === 0) return 'zero';\n    const groups = [[1e9, 'billion'], [1e6, 'million'], [1e3, 'thousand']];\n    const parts = [];\n    for (const [size, name] of groups) {\n      if (x >= size) { parts.push(under1000(Math.floor(x / size)) + ' ' + name); x %= size; }\n    }\n    if (x > 0) parts.push(under1000(x));\n    return parts.join(' ');\n  };\n  const total = Math.round(Math.abs(Number(n)) * 100);\n  const dollars = Math.floor(total / 100);\n  const cents = total % 100;\n  let s = `${words(dollars)} dollar${dollars === 1 ? '' : 's'}`;\n  if (cents) s += ` and ${words(cents)} cent${cents === 1 ? '' : 's'}`;\n  return s;\n};\n\n// Every amount appears as a number AND in words\n// Amounts in words first (to be spoken), with the number in brackets\nconst money = n => `${spokenMoney(n)} (${Math.abs(Number(n)).toLocaleString('en-US', { style: 'currency', currency: 'USD' })})`;\n\nconst when = t => new Date(String(t).slice(0, 19) + 'Z').toLocaleString('en-US', {\n  month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZone: 'UTC',\n});\n\n// Describe which filters were used\nconst filters = [`last ${input.days} days`];\nif (input.search) filters.push(`matching \"${input.search}\"`);\nif (input.account_type) filters.push(`${input.account_type} account only`);\n\nconst lines = [];\nlines.push(`TRANSACTIONS for customer ${j.customer_id} (${filters.join(', ')}).`);\nlines.push('Answer only from this data. Do not calculate new numbers yourself; use the totals given. Only call charges duplicates if they are listed under POSSIBLE DUPLICATE CHARGES. Each transaction has a reference (like T1001259); use it if the caller wants to dispute that transaction, but do not read references aloud unless needed.');\n\nif (!txs.length) {\n  lines.push('', 'No transactions found for these filters. Tell the caller none were found, and offer to search a longer period or a different name.');\n  return { json: { result: lines.join('\\n') } };\n}\n\n// Totals are calculated here, never by the agent\nconst out = txs.filter(t => Number(t.amount) < 0).reduce((s, t) => s + Number(t.amount), 0);\nconst inn = txs.filter(t => Number(t.amount) > 0).reduce((s, t) => s + Number(t.amount), 0);\nlines.push('', `SUMMARY: ${txs.length} transactions found. Total money out: ${money(out)}. Total money in: ${money(inn)}.`);\n\n// Possible duplicates: same account, same merchant, same amount, within 10 minutes\nconst sorted = [...txs].sort((a, b) => String(a.txn_time).localeCompare(String(b.txn_time)));\nconst dups = [];\nfor (let i = 0; i < sorted.length; i++) {\n  for (let k = i + 1; k < sorted.length; k++) {\n    const a = sorted[i];\n    const b = sorted[k];\n    const gapMinutes = (new Date(b.txn_time) - new Date(a.txn_time)) / 60000;\n    if (gapMinutes > 10) break;\n    const sameCharge = a.last4 === b.last4\n      && a.description === b.description\n      && Number(a.amount) === Number(b.amount)\n      && Number(a.amount) < 0;\n    if (sameCharge) dups.push({ a, b, gap: Math.round(gapMinutes) });\n  }\n}\nlines.push('', 'POSSIBLE DUPLICATE CHARGES (same merchant, same amount, within 10 minutes):');\nif (!dups.length) lines.push('- None found in this period.');\nfor (const d of dups) {\n  lines.push(`- ${d.a.description}, ${money(d.a.amount)}, charged twice on ${when(d.a.txn_time)}, ${d.gap} minutes apart (references ${d.a.txn_id} and ${d.b.txn_id}). The second one is the likely duplicate.`);\n}\n\n// List the most recent ones\nconst shown = txs.slice(0, input.limit);\nlines.push('', `MOST RECENT ${shown.length}:`);\nfor (const t of shown) {\n  const amt = Number(t.amount);\n  let s = `- ${when(t.txn_time)}: ${t.description}, ${amt < 0 ? 'money out' : 'money in'} ${money(amt)}`;\n  s += `, ${t.account_type} account ending ${t.last4}`;\n  if (t.card_last4) {\n    s += `, paid with debit card ending ${t.card_last4}`;\n    if (t.card_status && t.card_status !== 'active') s += ` (that card is now ${t.card_status})`;\n  }\n  if (t.status !== 'posted') s += `, status ${t.status}`;\n  s += ` (reference ${t.txn_id})`;\n  lines.push(s + '.');\n}\nif (txs.length > shown.length) {\n  lines.push(`(${txs.length - shown.length} older transactions not listed. Offer to narrow the search if needed.)`);\n}\n\nreturn { json: { result: lines.join('\\n') } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "598f5597-cc78-48a1-80c1-e8c04adb996c",
+      "name": "Build result"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Clean inputs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean inputs": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Build result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "activeVersionId": "b4e6465e-5859-4a8d-b986-6cf4dd13bb35",
+  "versionCounter": 36,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "versionMetadata": {
+    "name": "Version b4e6465e",
+    "description": ""
+  }
+}

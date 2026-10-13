@@ -1,0 +1,31 @@
+services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      - GENERIC_TIMEZONE=Asia/Karachi
+      - TZ=Asia/Karachi
+      - N8N_RESTRICT_FILE_ACCESS_TO=/data/knowledge-base
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ./knowledge-base:/data/knowledge-base:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      - POSTGRES_USER=bank
+      - POSTGRES_PASSWORD=bankpass
+      - POSTGRES_DB=novabank
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+volumes:
+  n8n_data:
+  pg_data:

@@ -1,0 +1,143 @@
+{
+  "updatedAt": "2026-10-12T14:53:38.068Z",
+  "createdAt": "2026-10-12T14:21:31.869Z",
+  "id": "HLxXzqZXysfPFX6f",
+  "name": "Tool - dispute_transaction",
+  "description": null,
+  "active": true,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "workflowInputs": {
+          "values": [
+            {
+              "name": "customer_id"
+            },
+            {
+              "name": "security_answer"
+            },
+            {
+              "name": "reference"
+            },
+            {
+              "name": "reason"
+            },
+            {
+              "name": "confirmed"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ],
+      "id": "c1e154fa-00a0-4a53-88d4-06ae6e26bc90",
+      "name": "When Executed by Another Workflow"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Make the agent's inputs safe and predictable before touching the database\nconst j = $json;\n\n// reference: like T1000531 or TR000001. Fix small formatting problems.\nlet reference = String(j.reference ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '');\nif (/^\\d+$/.test(reference)) reference = 'T' + reference;       // \"1000531\" becomes \"T1000531\"\nif (!/^(T|TR)\\d+$/.test(reference)) reference = '';             // anything else is invalid\n\n// reason: turn the caller's words into one of six values\nconst r = String(j.reason ?? '').toLowerCase();\nlet reason = '';\nif (/not me|unauthori|didn.?t make|don.?t recogni|never made|fraud|stolen|hack/.test(r)) reason = 'fraud';\nelse if (/twice|double|duplicate|two times|charged again/.test(r)) reason = 'duplicate';\nelse if (/wrong amount|overcharg|too much|more than|incorrect amount|wrong price/.test(r)) reason = 'wrong_amount';\nelse if (/never (received|got|arrived)|didn.?t (receive|get|arrive)|not (received|delivered)|never delivered/.test(r)) reason = 'not_received';\nelse if (/cancel|subscription|refund/.test(r)) reason = 'cancelled';\nelse if (r.trim()) reason = 'other';\n\n// confirmed: only an explicit yes counts\nconst yesWords = ['yes', 'y', 'true', 'confirmed', '1'];\nconst confirmed = yesWords.includes(String(j.confirmed ?? '').trim().toLowerCase()) ? 'yes' : '';\n\nreturn {\n  json: {\n    customer_id: String(j.customer_id ?? '').replace(/\\D/g, ''),\n    security_answer: String(j.security_answer ?? ''),\n    reference,\n    reason,\n    confirmed,\n  },\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        224,
+        0
+      ],
+      "id": "7343dd61-06da-4f09-96ad-8a0df054935a",
+      "name": "Clean inputs"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH c AS (\n  SELECT customer_id\n  FROM customers\n  WHERE customer_id = $1\n    AND lower(security_answer) = lower(trim($2))\n),\ntxn AS (\n  SELECT t.txn_id, t.txn_time, t.description, t.amount, t.channel, t.status,\n         (now()::date - t.txn_time::date) AS age_days\n  FROM transactions t\n  JOIN accounts a ON a.account_id = t.account_id\n  WHERE t.txn_id = $3\n    AND a.customer_id = (SELECT customer_id FROM c)\n),\nexisting AS (\n  SELECT d.dispute_id, d.reason, d.status, d.created_at\n  FROM disputes d\n  WHERE d.txn_id = (SELECT txn_id FROM txn)\n),\ninserted AS (\n  INSERT INTO disputes (txn_id, customer_id, reason)\n  SELECT t.txn_id, (SELECT customer_id FROM c), $4\n  FROM txn t\n  WHERE t.amount < 0\n    AND t.channel = 'card'\n    AND t.status = 'posted'\n    AND t.age_days <= 60\n    AND $4 IN ('duplicate', 'wrong_amount', 'not_received', 'cancelled', 'other')\n    AND $5 = 'yes'\n    AND NOT EXISTS (SELECT 1 FROM existing)\n  RETURNING dispute_id, created_at\n),\nmarked AS (\n  UPDATE transactions\n  SET status = 'disputed'\n  WHERE txn_id = (SELECT txn_id FROM txn)\n    AND EXISTS (SELECT 1 FROM inserted)\n  RETURNING txn_id\n)\nSELECT\n  (SELECT customer_id FROM c) AS customer_id,\n  (SELECT row_to_json(txn) FROM txn) AS txn,\n  (SELECT row_to_json(existing) FROM existing LIMIT 1) AS existing,\n  (SELECT row_to_json(inserted) FROM inserted) AS inserted;",
+        "options": {
+          "queryReplacement": "={{ [ $json.customer_id, $json.security_answer, $json.reference, $json.reason, $json.confirmed ] }}"
+        }
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.7,
+      "position": [
+        448,
+        0
+      ],
+      "id": "0edc70ef-c4f5-4bac-bb0b-88c842996981",
+      "name": "Execute a SQL query",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "UnYfMltGDGqVH2Q2",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Turn the result into clear instructions for the agent\nconst j = $json;\nconst input = $('Clean inputs').item.json;\n\nif (!j || !j.customer_id) {\n  return { json: { result: 'NOT VERIFIED. The customer ID or security answer did not match. Do not take any action. Ask the caller to verify again.' } };\n}\n\n// Helpers\nconst obj = v => (typeof v === 'string' ? (v ? JSON.parse(v) : null) : v) || null;\nconst t = obj(j.txn);\nconst existing = obj(j.existing);\nconst inserted = obj(j.inserted);\nconst money = n => Math.abs(Number(n)).toLocaleString('en-US', { style: 'currency', currency: 'USD' });\nconst day = d => new Date(String(d).slice(0, 19) + 'Z').toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: 'UTC' });\nconst fmt = d => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });\nconst addBusinessDays = (start, n) => {\n  const d = new Date(start);\n  let added = 0;\n  while (added < n) {\n    d.setDate(d.getDate() + 1);\n    const w = d.getDay();\n    if (w !== 0 && w !== 6) added++;\n  }\n  return d;\n};\nconst addDays = (start, n) => { const d = new Date(start); d.setDate(d.getDate() + n); return d; };\nconst cap = s => s.charAt(0).toUpperCase() + s.slice(1);\nconst reasonText = {\n  duplicate: 'a duplicate charge',\n  wrong_amount: 'a wrong amount',\n  not_received: 'goods or services not received',\n  cancelled: 'a charge after cancelling',\n  other: 'a problem with the charge',\n};\nconst today = new Date();\nlet result;\n\nif (!input.reference) {\n  result = 'NEED THE TRANSACTION. No valid transaction reference was given. Use get_transactions to find the charge the caller means (it lists a reference for each transaction), confirm the merchant, date, and amount with the caller, then use dispute_transaction with that reference.';\n} else if (!t) {\n  result = `NO TRANSACTION FOUND. No transaction with reference ${input.reference} was found on this customer's accounts. Use get_transactions to find the right charge and its reference, then try again.`;\n} else {\n  const what = `the ${money(t.amount)} charge from ${t.description} on ${day(t.txn_time)}`;\n\n  if (inserted) {\n    // The dispute was opened\n    const opened = new Date(inserted.created_at);\n    const credit = Math.abs(Number(t.amount)) > 25\n      ? ` A temporary credit of ${money(t.amount)} is usually added to the account by ${fmt(addBusinessDays(opened, 10))} while the case is investigated.`\n      : ' Disputes of 25 dollars or less do not get a temporary credit.';\n    result = `DONE. Dispute number ${inserted.dispute_id} has been opened for ${what}, for ${reasonText[input.reason]}.${credit} Most disputes are resolved by ${fmt(addDays(opened, 45))}. The customer will be notified of the result. Tell the caller the dispute number and these dates in two or three short sentences.`;\n  } else if (existing) {\n    result = `ALREADY DISPUTED. ${cap(what)} already has dispute number ${existing.dispute_id}, opened on ${fmt(new Date(existing.created_at))}, status ${existing.status}. Do not open another one. Tell the caller this.`;\n  } else if (input.reason === 'fraud') {\n    result = `THIS IS FRAUD, NOT A DISPUTE. The caller says they did not make ${what}. Do not open a dispute. Instead, offer to block the card right away with block_card, then follow the fraud steps.`;\n  } else if (Number(t.amount) >= 0) {\n    result = `CANNOT DISPUTE. ${cap(what.replace('charge', 'payment'))} is money coming in, not a charge. There is nothing to dispute.`;\n  } else if (t.channel !== 'card') {\n    result = `CANNOT DISPUTE. Only card payments can be disputed. ${cap(what)} is a ${t.channel.replace('_', ' ')}. A specialist can help with this kind of problem.`;\n  } else if (t.status === 'pending') {\n    result = `WAIT FIRST. ${cap(what)} is still pending, not final. Pending charges, especially duplicates, often drop off by themselves within 3 business days. Tell the caller to check again after ${fmt(addBusinessDays(today, 3))}, and to call back if it is still there once it posts.`;\n  } else if (Number(t.age_days) > 60) {\n    result = `TOO LATE TO DISPUTE. ${cap(what)} was ${t.age_days} days ago. Disputes must be raised within 60 days of the transaction. A specialist can help review it.`;\n  } else if (!input.reason) {\n    result = `NEED A REASON. ${cap(what)} can be disputed. Ask the caller what went wrong: charged twice, wrong amount, never received the goods or service, or charged after cancelling. Then use dispute_transaction again with their reason.`;\n  } else {\n    result = `NOT DONE YET. Ask the caller to confirm: \"Just to confirm, you'd like to dispute ${what}, because of ${reasonText[input.reason]}?\" Only if they clearly say yes, use dispute_transaction again with confirmed set to yes.`;\n  }\n}\n\nreturn { json: { result } };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        672,
+        0
+      ],
+      "id": "695f98a3-0df9-4e42-ac1b-cd85124250c3",
+      "name": "Build result"
+    }
+  ],
+  "connections": {
+    "When Executed by Another Workflow": {
+      "main": [
+        [
+          {
+            "node": "Clean inputs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clean inputs": {
+      "main": [
+        [
+          {
+            "node": "Execute a SQL query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Execute a SQL query": {
+      "main": [
+        [
+          {
+            "node": "Build result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "nodeGroups": [],
+  "activeVersionId": "f3f6cacb-e662-4e54-9653-ee3f04d1fc67",
+  "versionCounter": 27,
+  "triggerCount": 0,
+  "sourceWorkflowId": null,
+  "tags": [],
+  "versionMetadata": {
+    "name": "Version f3f6cacb",
+    "description": ""
+  }
+}
